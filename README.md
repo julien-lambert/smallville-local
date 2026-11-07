@@ -49,9 +49,9 @@ La sélection d'une mémoire tient compte de l'importance, de la récence, des m
 
 ### Répartition des tâches Apple / Jev
 
-**Jev 1.14** peut être activé à partir de l'interface : le système programme des **jugements cognitifs récurrents** pour les 25 habitants (avec étalement, file d'attente et quotas), après certains événements saillants et lors de rencontres. Chaque requête regroupe typiquement **six à sept jugements indépendants** sur la prochaine intention, l'émotion, la priorité politique, la qualité des preuves disponibles, l'observation directe, le risque social et la préférence électorale. Les rencontres interrogent également Jev sur le ton, la menace perçue et les éléments corroborant une affirmation. Un appel à Jev ne peut pas créer directement un événement ; **des transitions Python bornées transforment ses jugements en décisions et révisions auditables**.
+**Jev 1.14** peut être activé à partir de l'interface : le système programme des **jugements cognitifs récurrents** pour les 25 habitants (avec étalement, file d'attente et quotas), après certains événements saillants et lors de rencontres. Chaque requête regroupe typiquement **jusqu’à neuf jugements indépendants** sur la prochaine intention, l'émotion, la priorité politique, la qualité des preuves disponibles, l'observation directe, le risque social et la préférence électorale. Les rencontres interrogent également Jev sur le ton, la menace perçue et les éléments corroborant une affirmation. Un appel à Jev ne peut pas créer directement un événement ; **des transitions Python bornées transforment ses jugements en décisions et révisions auditables**.
 
-**Apple Foundation Models**, ou MLX local, génère les dialogues et certaines réflexions. **Le contexte est reconstruit à chaque prise de parole**, jamais figé : souvenirs propres, croyances personnelles, histoire relationnelle, état matériel et conatus, traits, émotions, saillance, vision du monde, intention actuelle et, si disponible, voisinage issu du graphe SurrealDB. L'autre agent ne transmet pas ses secrets au premier. **Il ne s'agit pas d'une nouvelle génération Apple à chaque minute simulée** : la génération intervient lors des échanges et réflexions, le moteur du monde évoluant entre-temps.
+**Apple Foundation Models**, ou MLX local, génère les dialogues et certaines réflexions. **Le contexte est reconstruit à chaque prise de parole et à chaque jugement Jev**, jamais figé : souvenirs propres, croyances personnelles, histoire relationnelle, état matériel et conatus, traits, émotions, saillance, vision du monde, intention actuelle et, si disponible, voisinage issu du graphe SurrealDB. L'autre agent ne transmet pas ses secrets au premier. **Il ne s'agit pas d'une nouvelle génération Apple à chaque minute simulée** : la génération intervient lors des échanges et réflexions, le moteur du monde évoluant entre-temps.
 
 Sans Apple/MLX disponible, le moteur de secours génère des répliques déterministes et le présente clairement. Sans Jev, les décisions suivent une politique locale de repli : les personnages ne sont alors pas pilotés par un modèle décisionnel externe.
 
@@ -61,11 +61,11 @@ Pour ne pas épuiser le crédit d'expérimentation, Jev est **désactivé au lan
 
 | Paramètre | Plafond de la V3 |
 |---|---:|
-| Réserve budgétaire cumulée interne | **4,25 USD** |
-| Appels cumulés | 3 500 |
-| Appels par journée simulée | 350 |
-| Appels par 24 heures réelles | 1 400 |
-| Intervalle minimal entre réservations | 2 secondes |
+| Réserve budgétaire cumulée interne | **4,50 USD** |
+| Appels cumulés | 12 000 |
+| Appels par journée simulée | 700 |
+| Appels par 24 heures réelles | 6 000 |
+| Intervalle minimal entre réservations | 1 seconde |
 | Taille du payload Jev | 12 000 octets |
 
 Le tarif TypeSafe utilisé pour l'estimation est **0,042 USD par million de tokens d'entrée** (modèle Jev 1.14). Chaque demande est **réservée avant l'envoi** avec une estimation prudente (tokens estimés à partir des octets, surcharge et marge) ; tout appel potentiellement facturé, même interrompu, conserve sa réservation. **Les limites protègent uniquement cette application, pas les autres usages de ta clé ni le solde réel TypeSafe.** Vérifie périodiquement ton compte TypeSafe ; la facturation peut changer. Aucun test automatique n'émet de requête payante, et aucune requête Jev ne se relance après une erreur réseau.

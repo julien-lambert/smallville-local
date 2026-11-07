@@ -147,8 +147,10 @@ class Store:
  def reserve_jev(self,minute,cfg,payload):
     data=payload.encode('utf8');n=len(data)
     if n>cfg['jev_max_payload_bytes']:return None,'Requête Jev trop longue'
-    # Token BPE généralement <= octets; réserver 2× les octets + overhead.
-    estimated=2*n+4096;reserve=estimated*0.042/1e6*1.5
+    # Réservation conservatrice : un token d'entrée consomme normalement
+    # au plus un octet UTF-8 plus les encadrements/surcharge API.
+    # Le montant retenu reste le MAX entre réserve et usage facturé observé.
+    estimated=n+4096;reserve=estimated*0.042/1e6*1.2
     now=time.time()
     with self.lock,self.connection() as c:
       c.execute('BEGIN IMMEDIATE')

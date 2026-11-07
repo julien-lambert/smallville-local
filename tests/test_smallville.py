@@ -219,7 +219,7 @@ class SocietyCase(unittest.TestCase):
         self.assertEqual(captured[-1]['ma_vision_du_monde']['empirical_evidence'],.9)
 
     def test_budget_larger_but_bounded(self):
-        self.assertEqual(self.cfg['jev_budget_usd'],4.25)
+        self.assertEqual(self.cfg['jev_budget_usd'],4.50)
         self.assertGreater(self.cfg['jev_max_calls_total'],100)
         self.assertLessEqual(self.cfg['jev_budget_usd'],5)
         self.assertGreater(self.store.budget(self.cfg)['max_calls_day'],8)

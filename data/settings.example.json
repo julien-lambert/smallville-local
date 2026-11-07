@@ -4,11 +4,11 @@
   "tick_seconds": 0.85,
   "jev_enabled": false,
   "jev_model": "jev-1.14.0",
-  "jev_budget_usd": 4.25,
-  "jev_max_calls_total": 3500,
-  "jev_max_calls_day": 350,
-  "jev_max_calls_24h": 1400,
-  "jev_min_interval_seconds": 2,
+  "jev_budget_usd": 4.5,
+  "jev_max_calls_total": 12000,
+  "jev_max_calls_day": 700,
+  "jev_max_calls_24h": 6000,
+  "jev_min_interval_seconds": 1,
   "jev_max_payload_bytes": 12000,
   "seed": 14712
 }
