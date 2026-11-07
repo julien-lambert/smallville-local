@@ -191,3 +191,8 @@ curl -s http://127.0.0.1:8000/api/health | python3 -m json.tool
 
 La valeur `surrealdb.status` doit devenir `connecté` ; `pending` diminue
 progressivement. Aucune modification de `.env` ni réinstallation n'est requise.
+
+
+## Diagnostic Jev certifié (TLS)
+
+Exécuter `./Installer.command` pour installer `truststore` et `certifi` dans `.venv`, sans toucher à `.env`. Exécuter ensuite `./VerifierJev.command`. La vérification initiale du certificat TLS n'utilise **aucune requête payante**. L'option explicite de test envoie **une seule** requête Jev avec le budget SQLite habituel. Aucun certificat n'est ignoré, aucune clé n'est imprimée, aucune autre API cloud n'est utilisée. En cas d'échec, le diagnostic affiche l'erreur à transmettre (sans partager la clé).

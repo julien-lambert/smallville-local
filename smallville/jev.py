@@ -98,16 +98,24 @@ class Jev:
     'Accept':'application/json','User-Agent':'SmallvilleLocal/3.0'})
   try:
    with self.opener.open(request,timeout=15) as response:
-    if response.url!=URL:raise RuntimeError('Destination TypeSafe inattendue')
+    if (getattr(response,'url',None) or response.geturl())!=URL:raise RuntimeError('Destination TypeSafe inattendue')
     result=json.loads(response.read(160000))
    answers=result.get('answers')
    if not isinstance(answers,dict) or not all(k in answers for k in questions):
     raise ValueError('Réponse Jev incomplète')
    self.store.finish_jev(ident,data=result)
    return answers,None
+  except urllib.error.HTTPError as e:
+   # Ne pas exposer le corps serveur (potentiellement rempli de données privées).
+   reason=f'HTTP {e.code} depuis TypeSafe (vérifier clé, modèle, question et quota)'
+   self.store.finish_jev(ident,error=reason)
+   return None, reason
   except Exception as e:
-   self.store.finish_jev(ident,error=f'{type(e).__name__}: {str(e)[:150]}')
-   return None,f'{type(e).__name__}: Jev indisponible (pas de nouvel essai automatique)'
+   detail=f'{type(e).__name__}: {str(e)[:170]}'
+   self.store.finish_jev(ident,error=detail)
+   if 'CERTIFICATE_VERIFY_FAILED' in detail:
+    return None,'TLS: certificat non validé. Exécuter VerifierJev.command (truststore requis). '
+   return None,detail
 
  def judge(self,minute,listener,speaker,message,relation,memories,beliefs,topic=None):
   """Évaluation de dialogue (1 appel, 5 jugements parallèles)."""
