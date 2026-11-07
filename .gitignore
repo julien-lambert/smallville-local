@@ -1,0 +1,8 @@
+.venv/
+.env
+data/*.sqlite3
+data/*.sqlite3-*
+data/settings.json
+__pycache__/
+*.pyc
+.DS_Store

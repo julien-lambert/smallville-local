@@ -1,0 +1,2 @@
+# Facultatif : installé explicitement lors de l'installation si macOS 26+
+apple-fm-sdk

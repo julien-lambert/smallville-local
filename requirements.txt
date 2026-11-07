@@ -1,0 +1,2 @@
+# Aucun paquet PyPI requis pour le moteur de simulation/serveur.
+# Le SDK Apple est uniquement facultatif : requirements-apple.txt

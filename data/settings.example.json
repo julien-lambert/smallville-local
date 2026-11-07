@@ -1,0 +1,14 @@
+{
+  "backend": "auto",
+  "mlx_url": "http://127.0.0.1:8080/v1/chat/completions",
+  "tick_seconds": 0.85,
+  "jev_enabled": false,
+  "jev_model": "jev-1.14.0",
+  "jev_budget_usd": 0.75,
+  "jev_max_calls_total": 100,
+  "jev_max_calls_day": 8,
+  "jev_max_calls_24h": 24,
+  "jev_min_interval_seconds": 30,
+  "jev_max_payload_bytes": 7000,
+  "seed": 14712
+}
