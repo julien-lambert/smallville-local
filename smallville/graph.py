@@ -41,7 +41,7 @@ def statement(kind, p):
         edge = f'{r}_{a}_{b}'
         details = quoted({'run_id':r,**p['data']})
         return f'RELATE OR UPDATE agent:{r}_{a}->knows:{edge}->agent:{r}_{b} CONTENT {details};'
-    if kind in ('memory', 'belief', 'dialogue', 'event', 'reflection', 'ballot', 'assembly', 'state', 'relation_change','belief_revision'):
+    if kind in ('memory', 'belief', 'dialogue', 'event', 'reflection', 'ballot', 'assembly', 'state', 'relation_change','belief_revision','project'):
         key = identifier(str(p['id']))
         data = dict(p.get('data') or {})
         data['run_id'] = r
@@ -50,7 +50,7 @@ def statement(kind, p):
         aid = p.get('agent')
         if aid:
             a = identifier(aid)
-            rel = {'memory':'remembers','belief':'holds','dialogue':'uttered','event':'acts_in','reflection':'reflects_on','ballot':'casts','assembly':'attends','state':'experienced','relation_change':'relates','belief_revision':'revised'}.get(kind)
+            rel = {'memory':'remembers','belief':'holds','dialogue':'uttered','event':'acts_in','reflection':'reflects_on','ballot':'casts','assembly':'attends','state':'experienced','relation_change':'relates','belief_revision':'revised','project':'pursues'}.get(kind)
             if rel:
                 edge_id = f'{r}_{a}_{key}'
                 # Un ID déterministe rend la reprise des opérations idempotente.

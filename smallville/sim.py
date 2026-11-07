@@ -1,7 +1,7 @@
 """Salem-sur-Brume : microsociété close, cognition locale, jugement Jev parcimonieux.
 
 Tous les habitants peuvent croire des choses fausses. Rien ne transforme une croyance
-subjective en fait. La charte rend les actes létaux impossibles pour le moteur.
+subjective en fait. La charte interdit le meurtre mais le monde peut connaître des infractions exceptionnelles.
 """
 from __future__ import annotations
 import copy
@@ -18,6 +18,8 @@ from .jev import Jev, decide
 from .graph import GraphBridge
 from .graph_memory import GraphMemory
 from .social_truth import explicitly_shared
+from . import executive
+from .transgression import deception, disobedience, confrontation
 from .society import clamp, election, psyche
 from .mind import ensure_mind, emotion_decay, arousal, category, apply_appraisal
 
@@ -56,7 +58,8 @@ class Simulation:
         if not self.state.get('run_id'):
             self.state['run_id']=uuid.uuid4().hex[:12]
         self.store.set_run(self.state['run_id'])
-        for a in self.state['agents'].values():ensure_mind(a)
+        for a in self.state['agents'].values():
+            ensure_mind(a);executive.ensure(a)
         self.cognition=LocalBrain(cfg);self.jev=Jev(store,cfg);self.graph=GraphBridge(store)
         self.graph_memory=GraphMemory(self.graph,store)
         self.tasks=queue.Queue(maxsize=18)
@@ -127,6 +130,9 @@ class Simulation:
         if day>s['last_day']:
             self._new_day(day);s['last_day']=day;s['conversations_today']=0;s['group_sessions_today']=0
         for a in s['agents'].values():
+            if not a.get('alive',True):continue
+            if a.get('detained_until',0)>minute:
+                a['activity']='detained';a['destination']=[a['x'],a['y']];continue
             a['social']=limit(a['social']-.0009);a['loneliness']=limit(a['loneliness']+.0007)
             a['energy']=limit(a['energy']-.00045);a['hunger']=limit(a['hunger']+.00029)
             if a['activity']=='resting':
@@ -140,6 +146,8 @@ class Simulation:
             if self.cfg.get('jev_enabled') and (minute+sum(ord(c) for c in a['id']))%19==0:
                 self._schedule_judgment(a['id'],'routine',minute)
             if ([a['x'],a['y']]==a['destination'] and minute>=a['stay_until']) or minute-a['last_plan']>150:
+                outcome=executive.progress_on_site(a,s,minute)
+                if outcome:self._record_project(a,outcome,minute)
                 self._plan(a,rng,minute)
             if [a['x'],a['y']]!=a['destination']:
                 if not a.get('route') or tuple(a['route'][-1])!=tuple(a['destination']):
@@ -153,6 +161,15 @@ class Simulation:
             election(self)
         if minute%15==0 and s['politics']['phase']=='campaign':self._campaign(rng,minute)
         self._social(rng,minute)
+        if minute%20==0:
+            for agent in s['agents'].values():
+                incident=disobedience(agent,minute,s['seed'])
+                if incident:
+                    self.store.event(minute,'civil_disobedience',agent['id'],None,
+                       f"{agent['name']} conteste un édit communal.",incident)
+                    self.store.memory(agent['id'],minute,'désobéissance',
+                       'J’ai choisi de contester une règle.',.75,'acte personnel')
+        if minute%10==0:confrontation(self,minute,rng)
         if s['ticks']%10==0:self.store.save(s)
 
     def _schedule_judgment(self,aid,trigger,minute,force=False):
@@ -186,6 +203,8 @@ class Simulation:
         with self.lock:
             if epoch!=self.epoch:return
             a=copy.deepcopy(self.state['agents'][aid])
+            if not a.get('alive',True):return
+            executive.ensure(a)
             related=sorted(self.state['relations'][aid].items(),key=lambda x:-x[1]['familiarity'])[:5]
             relations=[{'name':self.state['agents'][bid]['name'],
                         'trust':round(r['trust'],2),'tension':round(r['tension'],2)} for bid,r in related]
@@ -226,13 +245,26 @@ class Simulation:
             latest={b['proposition']:b for b in self.store.beliefs(aid,100)}
             prior=latest.get(focus['proposition']) if focus else None
             outcome=apply_appraisal(current,answers,focus,prior['confidence'] if prior else None)
+            if answers.get('project',{}).get('choice') in executive.KINDS:
+                current['executive']['jev_project']=answers['project']['choice']
+            c=answers.get('commitment',{}).get('noul')
+            if c is not None:
+                current['executive']['commitment_strength']=limit(.35+.60*float(c),.1,.97)
+            tactic=answers.get('tactic',{}).get('choice')
+            if tactic in ('sincere','withhold','mislead'):
+                current['executive']['tactic']=tactic
+            norm=answers.get('norm_strategy',{}).get('choice')
+            if norm in ('obey','dissent','defy','intimidate'):
+                current['executive']['norm_strategy']=norm
             current['last_jev_minute']=self.state['minute']
             # Un jugement Jev influe sur le comportement dès le prochain tick,
             # plutôt que d'attendre l'expiration arbitraire du plan précédent.
             if outcome['intention']!=outcome['before']['intention']:
                 current['last_plan']=min(current['last_plan'],self.state['minute']-151)
                 current['stay_until']=min(current['stay_until'],self.state['minute'])
-            current['last_plan']=-99999
+            if current['executive'].get('project') and outcome['intention']!=outcome['before']['intention']:
+                if current['hunger']>.85:
+                    executive.abandon(current,self.state['minute'],'urgence vitale')
             outcome['trigger']=trigger
             if outcome['revision']:
                 rev=outcome['revision']
@@ -259,39 +291,28 @@ class Simulation:
                 'candidate':current['candidate_preference'],'conatus':current['conatus']}})
             self.store.save(self.state)
 
+    def _record_project(self,agent,change,minute):
+        """L'action terminée est datée et exploitable dans le graphe."""
+        self.store.event(minute,'plan_progress',agent['id'],None,
+            f"{agent['name']} : {change.get('step',change.get('status'))}.",change)
+        self.store.queue_graph('project',{'run_id':self.state['run_id'],
+            'id':f"{minute}_{agent['id']}_step",'agent':agent['id'],
+            'data':{'minute':minute,**change}})
+
     def _plan(self,a,rng,minute):
-        hour=minute%1440//60
-        p=self.state['politics']
-        if p['phase']=='campaign' and p['election_minute']-minute<=110 and p['election_minute']>minute:
-            dest=list(PLACES['place']);activity='campaigning'
-            thought='Le scrutin approche ; je veux débattre et préserver mon avenir.'
-        elif a['hunger']>.69 or a['provisions']<=0:
-            dest=list(PLACES['grenier']);activity='seeking_food'
-            thought='Mon conatus me pousse à trouver des provisions.'
-        elif a['energy']<.24 or hour<6:
-            dest=a['home'][:];activity='resting';thought='Je récupère des forces pour persévérer.'
-        elif a['stress']>.72:
-            dest=list(PLACES['eglise'] if a['religiosity']>.55 else PLACES['taverne'])
-            activity='seeking_safety';thought='Je cherche un refuge face à la défiance.'
-        elif a['social']<.42 or a['loneliness']>.52:
-            dest=list(rng.choice([PLACES['place'],PLACES['marche'],PLACES['taverne'],PLACES['eglise']]))
-            activity='socialising';thought='J’aimerais comprendre les autres et trouver des alliés.'
-        elif (a.get('last_jev_minute',-99999)>=minute-210 and
-              a.get('intention') in ('pray','study','campaign','observe','socialise','work')):
-            place={'pray':'eglise','study':'ecole','campaign':'place',
-                   'observe':'place','socialise':'marche'}
-            dest=list(PLACES[place[a['intention']]] if a['intention'] in place else PLACES[a['workplace']])
-            activity={'pray':'praying','study':'investigating','campaign':'campaigning',
-                      'observe':'observing','socialise':'socialising','work':'working'}[a['intention']]
-            thought=f"Je poursuis une intention que j'ai choisie : {a['intention']}."
-        else:
-            options=[PLACES[a['workplace']],PLACES['place'],PLACES['marche']]
-            if a['religiosity']>.68:options.extend([PLACES['eglise']]*2)
-            if a['reasoning']>.7:options.append(PLACES['ecole'])
-            dest=list(rng.choice(options));activity='working'
-            thought='Je poursuis mes obligations en réfléchissant au destin du village.'
+        ex=executive.ensure(a)
+        old=ex['project']['id'] if ex['project'] else None
+        dest,activity,thought=executive.navigate(a,self.state,rng,minute)
+        new=ex['project']['id'] if ex['project'] else None
+        if new and new!=old:
+            proj=ex['project']
+            self.store.event(minute,'plan_created',a['id'],proj.get('target'),
+               f"{a['name']} décide : {proj['objective']}",
+               {'id':proj['id'],'steps':proj['steps'],'origin':proj['origin']})
+            self.store.queue_graph('project',{'run_id':self.state['run_id'],
+                'id':proj['id'],'agent':a['id'],'data':{'minute':minute,**proj}})
         a['destination']=dest;a['route']=[];a['activity']=activity;a['thought']=thought
-        a['last_plan']=minute;a['stay_until']=minute+rng.randint(8,27)
+        a['last_plan']=minute;a['stay_until']=minute+rng.randint(12,25)
 
     def _campaign(self,rng,minute):
         if minute%60!=0:return
@@ -308,7 +329,7 @@ class Simulation:
     def _social(self,rng,minute):
         if len(self.pending)>=2 or self.tasks.full() or self.state['conversations_today']>=32:return
         people=list(self.state['agents'].values())
-        free=[a for a in people if minute-a['last_social']>=20]
+        free=[a for a in people if a.get('alive',True) and a.get('detained_until',0)<=minute and minute-a['last_social']>=20]
         hubs=[PLACES[k] for k in ('eglise','place','taverne','mairie','marche')]
         if (self.state['group_sessions_today']<4 and minute%15==0 and rng.random()<.45):
             for hub in rng.sample(hubs,len(hubs)):
@@ -333,7 +354,9 @@ class Simulation:
                 pair='-'.join(sorted([a['id'],b['id']]))
                 if pair in self.pending or minute-self.state['seen_pairs'].get(pair,-100)<40:continue
                 chance=.14+.1*(a['traits']['extraversion']+b['traits']['extraversion'])/2
-                if rng.random()<chance:candidates.append((a,b,pair))
+                if executive.ensure(a)['project'] and executive.ensure(a)['project'].get('target')==b['id']:chance+=.52
+                if executive.ensure(b)['project'] and executive.ensure(b)['project'].get('target')==a['id']:chance+=.52
+                if rng.random()<min(.95,chance):candidates.append((a,b,pair))
         if not candidates:return
         a,b,pair=rng.choice(candidates)
         if b['traits']['extraversion']>a['traits']['extraversion'] and rng.random()<.7:a,b=b,a
@@ -380,6 +403,9 @@ class Simulation:
              'traits':{**a['traits'],**{k:a[k] for k in ('religiosity','credulity','reasoning','aggression','suspicion','tolerance')}},
              'resources':{'provisions':a['provisions'],'coins':a['coins']},
              'graph_neighborhood':graph_info,
+             'executive_project':a.get('executive',{}).get('project'),
+             'prospective_agenda':a.get('executive',{}).get('agenda',[])[:4],
+             'rhetorical_strategy':a.get('executive',{}).get('tactic','sincere'),
              'stance':'curious'}
         return a,b,rel,memories,beliefs,ctx
 
@@ -435,9 +461,19 @@ class Simulation:
         known={b['proposition'] for b in self.store.beliefs(bid,120)}
         fresh=[b for b in own if b['proposition'] not in known]
         shared=random.Random(minute+len(aid)).choice(fresh) if fresh else None
+        if shared and executive.ensure(self.state['agents'][aid]).get('tactic')=='withhold':
+            shared=None
         topic=shared['proposition'] if shared else 'le scrutin et l’avenir de la communauté'
         a,b,rel,mem,beliefs,ctx=self._ctx(aid,bid,topic)
-        first,model,error,latency=self.cognition.speak(a,b,ctx)
+        strategy=deception(a,shared,bid,minute)
+        if strategy:
+            first=strategy['utterance'];model='intentional-deception';error=None;latency=0.0
+            self.store.event(minute,'deception',aid,bid,
+                f"{a['name']} choisit de tromper {b['name']}.",
+                {'private_belief':strategy['internal_belief'],
+                 'public_claim':strategy['reported_claim'],'motive':strategy['motive']})
+        else:
+            first,model,error,latency=self.cognition.speak(a,b,ctx)
         self.store.log_model(minute,aid,'speech',model,latency,error)
         if epoch!=self.epoch:return
         self._utter(aid,bid,first,minute,model)
@@ -498,6 +534,9 @@ class Simulation:
             self.state['agents'][aid]['mood']=limit(self.state['agents'][aid]['mood']+.009,-1,1)
             self.store.relation(aid,bid,self.state['relations'][aid][bid],minute)
             self.store.save(self.state)
+            for individual,other_id in ((aid,bid),(bid,aid)):
+                changed=executive.contact(self.state['agents'][individual],other_id,minute)
+                if changed:self._record_project(self.state['agents'][individual],changed,minute)
             self._schedule_judgment(bid,'rencontre',minute,force=True)
 
     def _group_conversation(self,key,participants,minute,epoch):
@@ -572,6 +611,7 @@ class Simulation:
         minute=self.state['minute']
         self._daily_economy(minute)
         for aid,a in self.state['agents'].items():
+            if not a.get('alive',True):continue
             prev=a['traits'].copy();e=a['experiences']
             delta=max(-.004,min(.004,(e['positive']-e['negative'])*.0009))
             a['traits']['agreeableness']=limit(a['traits']['agreeableness']+delta)
@@ -603,6 +643,11 @@ class Simulation:
             self.store.queue_graph('reflection',{'run_id':self.state['run_id'],
               'id':f'{minute}_{aid}','agent':aid,'data':{'minute':minute,'content':reflection}})
             a['experiences']={'positive':0,'negative':0,'social':0}
+            ex=executive.ensure(a)
+            ex['future_scenarios']=(ex['future_scenarios'] or [])[-2:]
+            self.store.memory(aid,minute,'projection',
+                'Projection personnelle : '+str(ex['future_scenarios'][-1]['then'] if ex['future_scenarios'] else 'Je préparerai ma journée.'),
+                .50,'imaginaire — hypothèse non factuelle')
             if len(self.state['agents'])<=25 and not self.tasks.full():
                 self.tasks.put_nowait(('reflect',self.epoch,aid,minute))
             if a['traits']!=prev:

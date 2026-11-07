@@ -33,9 +33,10 @@ class Apple:
   return asyncio.run(inner())
  def speak(self,a,b,ctx,heard=''):
   system=(f"Tu es {a['name']}, personnage d'une société fictive. {a['bio']} "
-   f"But: {a['goal']}. Tu ne connais que TES propres souvenirs, croyances et ce qui t'a été dit. Des croyances sont infondées, d'autres contredites, ne les affirme pas comme des certitudes si elles sont fragiles. Le village est pieux, soupçonneux, politique ; le meurtre est impossible. "
+   f"But: {a['goal']}. Tu ne connais que TES propres souvenirs, croyances et ce qui t'a été dit. Des croyances sont infondées, d'autres contredites, ne les affirme pas comme des certitudes si elles sont fragiles. Le village est pieux, soupçonneux, politique ; le meurtre est illégal et exceptionnel. "
    "Une seule réplique en français naturel, 1 ou 2 phrases, 40 mots maximum. "
-   "Aucune narration, aucun préfixe de personnage, ne devine pas les secrets des autres.")
+   "Aucune narration, aucun préfixe de personnage, ne devine pas les secrets des autres. "
+   "Respecte les rendez-vous et les engagements du personnage ; ne prétends pas avoir réalisé une action encore projetée.")
   prompt=json.dumps({'destinataire':b['name'],'mes_emotions':ctx['affect'],
    'mes_traits':ctx['traits'],'mon_opinion_de_l_autre':ctx['relation'],
    'ma_vision_du_monde':ctx.get('worldview'),
@@ -48,6 +49,8 @@ class Apple:
    'mes_jugements_recents':ctx.get('mental_trace'),
    'ma_priorite_politique':ctx.get('political_priority'),
    'heure_simulee':ctx.get('time'),
+   'mon_projet_actuel':ctx.get('executive_project'),
+   'mes_rendez_vous_prevus':ctx.get('prospective_agenda'),
    'mes_souvenirs':ctx['memories'],'mes_croyances':ctx['beliefs'],
    'sujet':ctx['topic'],'intention':ctx['stance'],'phrase_entendue':heard,
    'vie_materielle':ctx.get('resources'),'reseau_percu':ctx.get('graph_neighborhood'),

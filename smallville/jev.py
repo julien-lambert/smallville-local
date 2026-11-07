@@ -74,6 +74,18 @@ APPRAISAL_QUESTIONS={
    'relations':'Friendships, distrust, reputation and belonging.',
    'preuves':'Evidence, contradictions and testing claims.'}},
  'trust_in_community':{'type':'noul','instructions':'Does this person currently feel that the community can be trusted to protect their interests?'},
+ 'project':{'type':'choice','instructions':'Which long-term project best fits this person given survival needs, history, and the current commitments?',
+   'criteria':{'survival':'Improve food security','investigate':'Investigate a disputed claim with evidence',
+    'alliance':'Build a trust-based alliance','campaign':'Organize a political initiative',
+    'faith':'Pursue religious community involvement','income':'Earn income and supplies',
+    'protest':'Peacefully challenge an unfair rule'}},
+ 'commitment':{'type':'noul','instructions':'Should this person honor their existing commitment rather than switch to a new project, given the current circumstances?'},
+ 'tactic':{'type':'choice','instructions':'How will the person strategically disclose an important belief to another individual, considering their private goals?',
+   'criteria':{'sincere':'Tell what they believe','withhold':'Keep a relevant belief private',
+     'mislead':'Deliberately assert the opposite of a belief held with high personal confidence'}},
+ 'norm_strategy':{'type':'choice','instructions':'How will the person respond to a controversial civic rule, considering their fear, trust, and perceived legitimacy?',
+   'criteria':{'obey':'Comply with the rule','dissent':'Criticize peacefully in public',
+    'defy':'Refuse to comply with a minor civic edict','intimidate':'Intimidate a perceived adversary'}},
 }
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -155,6 +167,9 @@ class Jev:
    'private_memories':[{'event':m['content'][:165],'importance':round(m['importance'],2)} for m in memories[:6]],
    'private_beliefs':[{'claim':b['proposition'][:165],'confidence':round(b['confidence'],2)} for b in beliefs[:5]],
    'belief_to_review':{'claim':top['proposition'][:250],'confidence':top['confidence']} if top else None,
+   'existing_project':agent.get('executive',{}).get('project'),
+   'future_agenda':agent.get('executive',{}).get('agenda',[])[:3],
+   'recent_future_scenarios':agent.get('executive',{}).get('future_scenarios',[])[:2],
    'subjective_social_ties':relations[:5],
    'public_situation':public_context,
   }

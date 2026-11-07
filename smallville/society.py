@@ -99,12 +99,13 @@ def election(sim):
     state=sim.state;politics=state['politics']
     if politics['phase']=='complete':return politics['result']
     agents=state['agents'];rel=state['relations'];minute=state['minute']
-    candidates=[c for c in politics['candidates'] if c in agents]
-    votes=[];weight_sum={aid:0.0 for aid in agents}
+    candidates=[c for c in politics['candidates'] if c in agents and agents[c].get('alive',True)]
+    votes=[];weight_sum={aid:0.0 for aid,a in agents.items() if a.get('alive',True)}
     for aid,a in agents.items():
+        if not a.get('alive',True):continue
         beliefs=sim.store.beliefs(aid,30)
         selected,scores=vote_candidate(a,agents,rel[aid],candidates,beliefs,state['seed']+minute+sum(ord(c) for c in aid))
-        proposal=ballot_weights(a,agents,rel[aid],beliefs)
+        proposal=ballot_weights(a,{k:v for k,v in agents.items() if v.get('alive',True)},rel[aid],beliefs)
         for target,v in proposal.items():weight_sum[target]+=v
         rationale=('priorité aux nécessiteux' if a['generosity']>.65 else
                    'défense des traditions' if a['religiosity']>.75 else 'équilibre des intérêts')
