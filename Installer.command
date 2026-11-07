@@ -27,6 +27,13 @@ os.chmod(p,0o600)
 print(".env préservé, identifiants SurrealDB initialisés localement.")
 '
 unset NEW_JEV
+# Jev est le seul service cloud de la simulation. Le modèle macOS natif de
+# confiance TLS corrige notamment CERTIFICATE_VERIFY_FAILED sur certains Python.
+if ! .venv/bin/python -c 'import truststore' >/dev/null 2>&1; then
+  printf '\nInstallation des certificats TLS pour Jev (une seule fois)...\n'
+  .venv/bin/python -m pip install --disable-pip-version-check truststore certifi || \
+    echo 'Le support des certificats Jev n’a pas pu être installé ; les autres fonctionnalités restent locales.'
+fi
 if ! command -v surreal >/dev/null 2>&1; then
   printf '\nSurrealDB permet de sauvegarder le graphe sur disque, indépendamment de SQLite.\n'
   read -r -p 'Installer SurrealDB via Homebrew [o/N] ? ' Y

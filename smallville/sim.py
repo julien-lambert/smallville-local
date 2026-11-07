@@ -17,6 +17,7 @@ from .models import LocalBrain
 from .jev import Jev, decide
 from .graph import GraphBridge
 from .graph_memory import GraphMemory
+from .social_truth import explicitly_shared
 from .society import clamp, election, psyche
 from .mind import ensure_mind, emotion_decay, arousal, category, apply_appraisal
 
@@ -441,7 +442,8 @@ class Simulation:
         if epoch!=self.epoch:return
         self._utter(aid,bid,first,minute,model)
         listener,speaker,relation,m,beliefs,ctx2=self._ctx(bid,aid,topic)
-        answers,error=self.jev.judge(minute,listener,speaker,first,relation,m,beliefs)
+        answers,error=self.jev.judge(minute,listener,speaker,first,relation,m,beliefs,
+            topic=shared['proposition'] if shared else None)
         result=decide(answers,listener,relation)
         with self.lock:
             if epoch!=self.epoch:return
@@ -459,7 +461,10 @@ class Simulation:
             other['emotions']['compassion']=limit(other['emotions']['compassion']+.03) if result['stance']=='warm' else other['emotions']['compassion']
             other['experiences']['social']+=1
             other['experiences']['negative' if result['mood_delta']<0 else 'positive']+=1
-            if shared:
+            # Une croyance ne peut être acquise sans communication réelle.
+            communicated = (float((answers.get('claim_expressed') or {}).get('noul',0)) >= .70
+                            if answers else explicitly_shared(first,shared['proposition'])) if shared else False
+            if shared and communicated:
                 self._diffuse(aid,bid,shared,minute)
                 if answers:
                     # Nuancer la confiance selon les éléments perçus, sans transformer une parole en vérité.
@@ -522,7 +527,8 @@ class Simulation:
                     if bid==aid:continue
                     self.store.memory(bid,minute,'entendu_en_groupe',f"{a['name']} a dit : {txt}",.65,aid)
                     self.state['agents'][bid]['experiences']['social']+=1
-                    if shared:self._diffuse(aid,bid,shared,minute,group=True)
+                    if shared and explicitly_shared(txt,shared['proposition']):
+                        self._diffuse(aid,bid,shared,minute,group=True)
                     # Une assemblée peut déclencher une nouvelle appréciation Jev
                     # sans forcer d'appel si un quota ou un cooldown est atteint.
                     if shared:self._schedule_judgment(bid,'assemblée',minute,force=True)

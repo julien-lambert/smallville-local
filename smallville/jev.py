@@ -13,6 +13,18 @@ from .mind import ACTIONS, EMOTIONS, PRIORITIES
 
 URL='https://api.typesafe.ai/v1/systemone'
 
+def secure_tls_context():
+ """Valide TLS avec les certificats macOS (ou un bundle CA connu). Jamais de mode insecure."""
+ try:
+  import truststore
+  return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+ except ImportError:
+  try:
+   import certifi
+  except ImportError:
+   return ssl.create_default_context()
+  return ssl.create_default_context(cafile=certifi.where())
+
 SOCIAL_QUESTIONS={
  'tone':{'type':'choice','instructions':'How would the listener interpret this utterance, considering the listener’s private history?',
   'criteria':{'kind':'Warm and supportive toward the listener.',
@@ -72,7 +84,7 @@ class Jev:
  def __init__(self,store,cfg):
   self.store=store;self.cfg=cfg;self.key=read_key()
   self.opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),
-    urllib.request.HTTPSHandler(context=ssl.create_default_context()),NoRedirect())
+    urllib.request.HTTPSHandler(context=secure_tls_context()),NoRedirect())
 
  def _request(self,minute,state,questions):
   if not self.cfg['jev_enabled']:return None,'désactivé'
@@ -97,7 +109,7 @@ class Jev:
    self.store.finish_jev(ident,error=f'{type(e).__name__}: {str(e)[:150]}')
    return None,f'{type(e).__name__}: Jev indisponible (pas de nouvel essai automatique)'
 
- def judge(self,minute,listener,speaker,message,relation,memories,beliefs):
+ def judge(self,minute,listener,speaker,message,relation,memories,beliefs,topic=None):
   """Évaluation de dialogue (1 appel, 5 jugements parallèles)."""
   state={'listener':{'name':listener['name'],'role':listener.get('role'),
     'biography':listener['bio'],'goal':listener.get('goal'),
@@ -109,7 +121,12 @@ class Jev:
    'listener_relevant_memories':[m['content'][:160] for m in memories[:5]],
    'listener_beliefs':[{'claim':b['proposition'][:160],'confidence':b['confidence']} for b in beliefs[:5]],
    'utterance':message[:330]}
-  return self._request(minute,state,SOCIAL_QUESTIONS)
+  questions=dict(SOCIAL_QUESTIONS)
+  if topic:
+   state['proposition_a_communiquer']=str(topic)[:350]
+   questions['claim_expressed']={'type':'noul','instructions':
+       'Does the utterance explicitly convey the claim in `proposition_a_communiquer`? Mere thematic overlap is insufficient.'}
+  return self._request(minute,state,questions)
 
  def appraise(self,minute,agent,memories,beliefs,relations,public_context,candidates):
   """Un seul appel Jev regroupe cognition, affects, valeur politique et examen de preuve."""
