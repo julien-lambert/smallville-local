@@ -62,7 +62,8 @@ class Apple:
        'monde_percu':a.get('worldview'),'emotions':a.get('emotions'),
        'salience':a.get('salience'),'intention':a.get('intention'),
        'priorite_politique':a.get('political_priority'),
-       'dernier_jugement':a.get('mental_trace')},ensure_ascii=False)),450)
+       'dernier_jugement':a.get('mental_trace'),
+       'graphe_memoriel':str(a.get('graph_context') or '')[:1400]},ensure_ascii=False)),450)
 
 class MLX:
  name='mlx_local'

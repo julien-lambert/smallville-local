@@ -105,7 +105,7 @@ class Store:
       if prev is None or abs(prev-confidence)>1e-5:
         cur=c.execute('INSERT INTO belief_history(run_id,agent,proposition,before,after,source,minute) VALUES(?,?,?,?,?,?,?)',
           (getattr(self,'run_id',''),agent,proposition,prev,confidence,source,minute))
-        self._queue(c,'belief_revision',{'id':str(cur.lastrowid),'agent':agent,'data':{
+        self._queue(c,'belief_revision',{'id':str(cur.lastrowid),'agent':agent,'belief_id':str(row['id']),'data':{
           'proposition':proposition,'before':prev,'after':confidence,
           'source':source,'minute':minute}})
  def belief_history(self,agent,n=40):

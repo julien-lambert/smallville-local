@@ -102,3 +102,73 @@ Les tests utilisent un faux backend Jev et **n'ouvrent aucun réseau public**. L
 [Apple Foundation Models SDK Python](https://github.com/apple/python-apple-fm-sdk) · [TypeSafe Jev](https://docs.typesafe.ai/) · [Skill TypeSafe](https://github.com/typesafe-ai/skills) · [SurrealDB](https://surrealdb.com/docs/)
 
 Projet de recherche exploratoire sous licence MIT. L'application ne stocke pas les clés dans le dépôt public et ne transmet à Jev que le contexte choisi pour chaque jugement quand tu l'actives.
+
+## V4 — Direction artistique et mémoire relationnelle (Salem vivant)
+
+La carte a été redessinée en **Canvas 2D procédural**, sans ressources distantes :
+maisons et institutions individualisées, clochers, toitures, marché, ruelles, arbres,
+brume légère animée, éclairage de jour/nuit et personnages vêtus. L'interface adopte
+une esthétique éditoriale inspirée des archives anciennes. Les mouvements sont
+réduits automatiquement si `prefers-reduced-motion` est activé dans macOS.
+
+### SurrealDB n'est plus seulement un entrepôt
+
+Le module `smallville/graph_memory.py` prépare un **dossier de preuves subjectif**
+pour chaque agent à partir des traversées SurrealQL suivantes :
+
+- `agent → remembers → memory` : souvenirs liés à des épisodes effectivement vécus ;
+- `agent → holds → belief` : croyances subjectives et degré de certitude ;
+- `agent → revised → belief_revision → updates → belief` : évolution de croyances ;
+- `agent ← influenced` : personnes et messages qui ont influencé cet agent ;
+- `agent → knows` : relations dirigées et niveaux de confiance ;
+- `memory / belief / event → about → theme` : indexation thématique de nouvelles observations.
+
+Un algorithme de récupération limite et classe les éléments selon la pertinence
+lexicale, le thème actuellement saillant, la récence et l'importance d'un souvenir.
+**Seules les observations que l'agent pouvait connaître entrent dans son contexte** :
+le graphe complet de l'observateur n'est jamais transmis à la pensée de l'agent.
+Les requêtes Apple Foundation Models et Jev reconstruisent leur contexte à chaque
+inférence. Ce dossier fait donc évoluer la conversation et le jugement en fonction
+de l'histoire du personnage, sans entraîner un modèle ni prétendre que SurrealDB
+est un modèle neuronal.
+
+L'inspecteur affiche maintenant l'onglet « Traces » : chemins d'attribution des
+croyances et changements de confiance. Le panneau « Archives vivantes » montre
+les souvenirs et croyances sélectionnés pour un agent. Le graphe social peut
+basculer vers le réseau de transmission des rumeurs lorsque SurrealDB est connecté.
+
+Deux nouveaux points d'accès locaux :
+
+- `GET /api/insight?agent=alice` : dossier subjectif borné d'Alice ;
+- `GET /api/influences` : chaînes de rumeurs visibles par le chercheur (provenances,
+  longueurs de cascade, diffuseurs, premiers témoins supposés).
+
+Quand SurrealDB est indisponible ou en cours de synchronisation, l'application
+conserve un **repli SQLite**. L'interface indique la provenance des traces et
+n'invente pas de liens non observés. Le transfert SurrealDB passe exclusivement par
+`127.0.0.1:8001`; la seule requête cloud potentielle reste Jev sur activation.
+
+### Mise à jour d'une installation existante
+
+```bash
+cd ~/smallville-local
+git pull --ff-only origin main
+./Lancer.command
+```
+
+Aucune réinstallation n'est nécessaire si l'environnement local fonctionnait déjà
+avec la version V3. Le fichier `.env`, la clé TypeSafe et les bases `data/` ne sont
+pas suivis par Git. Pour une installation qui ne dispose pas de SurrealDB,
+lancer une seule fois `./Installer.command` puis `./Lancer.command`.
+
+### Vérifications
+
+- `python -m unittest discover -s tests -v` : tests de mémoire et provenance,
+  régressions socioéconomiques, budget Jev et confidentialité ;
+- `node --check static/app.js` : vérification syntaxique du moteur graphique ;
+- `curl http://127.0.0.1:8000/api/insight?agent=alice` : inspection locale des
+  traces de l'agent choisi.
+
+La nouvelle direction artistique est implémentée en code, mais doit être évaluée
+visuellement dans un navigateur sur Mac : une validation pixel-par-pixel du rendu
+n'a pas été possible dans l'environnement de test.

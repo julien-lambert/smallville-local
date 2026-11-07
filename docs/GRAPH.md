@@ -79,3 +79,43 @@ FROM belief_revision WHERE run_id = 'RUN' ORDER BY minute;
 ```
 
 Les changements successifs sont des nœuds immuables du graphe (contrairement au nœud `belief` qui porte la confiance courante). La table SQLite `belief_history` réplique ce journal pour préserver l’analyse même lorsque SurrealDB est arrêté.
+
+## Récupération cognitive : requêtes datées et limitées
+
+Depuis V4, le graphe ne sert plus uniquement à l'export. Le module
+`smallville/graph_memory.py` interroge en une seule opération locale les chemins
+orientés de **l'agent courant**. Les résultats sont classés par actualité,
+importance, mots pertinents et saillance du sujet ; seuls les éléments retenus
+entrent dans les contextes Apple/Jev. Les révisions ne sont pas fusionnées
+silencieusement : leur provenance et leur sens restent conservés.
+
+```sql
+-- Souvenirs accessibles à un seul habitant, pas à tous les agents
+SELECT content, source, importance, minute
+FROM agent:RUN_alice->remembers->memory
+ORDER BY minute DESC LIMIT 90;
+
+-- Croyances personnelles et changements antérieurs
+SELECT proposition, confidence, source, minute
+FROM agent:RUN_alice->holds->belief
+ORDER BY minute DESC LIMIT 60;
+SELECT proposition, before, after, source, minute
+FROM agent:RUN_alice->revised->belief_revision
+ORDER BY minute DESC LIMIT 70;
+
+-- Sources reçues et liens de confiance dirigés
+SELECT in, belief, minute FROM agent:RUN_alice<-influenced;
+SELECT out, trust, tension FROM agent:RUN_alice->knows;
+```
+
+Les nouveaux nœuds `theme` sont alimentés par `about`; les nouvelles révisions
+sont reliées à la croyance modifiée par `updates`. Les anciens événements restent
+archivés tels quels ; l'indexation additionnelle est progressive lors des nouvelles
+observations. L'API chercheur `/api/influences` estime des cascades par proposition
+et chronologie ; une chaîne reconstruite est une **succession de transmissions**, non
+une preuve d'accord, de véracité ou de causalité psychologique.
+
+Les analyses du graphe sont volontairement séparées du dossier subjectif d'un
+agent, afin qu'aucun personnage ne découvre automatiquement des secrets qu'il
+n'a jamais entendus. Si le serveur SurrealDB n'a pas encore ingéré son outbox,
+la récupération est complétée par les données SQLite actuelles.

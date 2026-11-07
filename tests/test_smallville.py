@@ -225,3 +225,66 @@ class SocietyCase(unittest.TestCase):
         self.assertGreater(self.store.budget(self.cfg)['max_calls_day'],8)
 
 if __name__=='__main__':unittest.main()
+
+
+class CognitiveGraphTest(unittest.TestCase):
+    """Le réseau ne doit jamais rendre un secret étranger accessible au modèle."""
+
+    def setUp(self):
+        import tempfile
+        from smallville.store import Store
+        from smallville.sim import Simulation
+        from smallville.settings import DEFAULT
+        self.temp=tempfile.TemporaryDirectory()
+        self.store=Store(path=__import__('pathlib').Path(self.temp.name)/'social.sqlite3')
+        self.cfg={**DEFAULT,'seed':784,'backend':'scripted','jev_enabled':False}
+        self.sim=Simulation(self.store,self.cfg)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_personal_epistemic_boundary_and_revision_chain(self):
+        alice=self.sim.insight('alice')
+        basile=self.sim.insight('basile')
+        from smallville.seed import SECRETS
+        self.assertIn(SECRETS['alice'],[x['proposition'] for x in self.store.beliefs('alice')])
+        self.assertNotIn(SECRETS['basile'],__import__('json').dumps(alice,ensure_ascii=False))
+        self.assertNotIn(SECRETS['alice'],__import__('json').dumps(basile,ensure_ascii=False))
+        self.store.believe('alice','Un soupçon contesté',.73,'basile',501)
+        self.store.believe('alice','Un soupçon contesté',.31,'enquête locale',510)
+        archive=self.sim.insight('alice')
+        found=next(x for x in archive['croyances'] if x['proposition']=='Un soupçon contesté')
+        self.assertGreaterEqual(len(found['evolution']),2)
+        self.assertEqual(found['source_declaree'],'enquête locale')
+
+    def test_query_traverses_graph_and_uses_own_records(self):
+        from smallville.graph_memory import GraphMemory
+        bridge=self.sim.graph
+        bridge.status='connecté'
+        captured=[]
+        def query(sql,timeout=0):
+            captured.append(sql)
+            return [{'status':'OK','result':[{'content':'J’ai entendu Alice défendre une preuve.',
+                     'importance':.9,'minute':501,'source':'alice'}]},
+                    {'status':'OK','result':[{'proposition':'L’élection est contestée',
+                     'confidence':.64,'source':'alice','minute':500}]},
+                    {'status':'OK','result':[]},
+                    {'status':'OK','result':[]},
+                    {'status':'OK','result':[]}]
+        bridge.query=query
+        context=GraphMemory(bridge,self.store).context('run123','basile','élection et preuve',502)
+        self.assertEqual(context['origine'],'surrealdb')
+        self.assertTrue(context['souvenirs'])
+        self.assertIn('agent:run123_basile->remembers->memory',captured[0])
+        self.assertIn('agent:run123_basile->holds->belief',captured[0])
+        self.assertNotIn('agent:run123_alice->remembers->memory',captured[0])
+
+    def test_graph_provenance_topic_edges(self):
+        from smallville.graph import statement
+        q=statement('belief_revision',{'run_id':'run777','agent':'alice',
+           'id':'123','belief_id':'5','data':{'proposition':'Le maire a menti',
+           'before':.8,'after':.4,'minute':540}})
+        self.assertIn('->updates:',q)
+        self.assertIn('belief:run777_5',q)
+        self.assertIn('->about:',q)
+        self.assertIn('theme:run777_politique',q)

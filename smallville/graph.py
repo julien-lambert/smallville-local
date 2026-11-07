@@ -11,6 +11,7 @@ import time
 import urllib.error
 import urllib.request
 from .settings import read_var
+from .mind import category
 
 HOST = 'http://127.0.0.1:8001'
 _NS, _DB = 'smallville', 'society'
@@ -54,6 +55,19 @@ def statement(kind, p):
                 edge_id = f'{r}_{a}_{key}'
                 # Un ID déterministe rend la reprise des opérations idempotente.
                 sql += f' RELATE OR UPDATE agent:{r}_{a}->{rel}:{edge_id}->{node_id} SET minute = {int(data.get("minute", 0))}, run_id = {quoted(r)};' 
+        # Index sémantique : mémoire / événement / croyance -> thème partagé.
+        # Une traversée agent -> mémoire -> thème permet de sélectionner les
+        # épisodes associés à une préoccupation sans lire les secrets d'autrui.
+        if kind in ('memory','belief','dialogue','event','reflection','belief_revision'):
+            subject=str(data.get('proposition') or data.get('content') or data.get('text') or '')
+            if subject:
+                theme=identifier(category(subject))
+                theme_id=f'theme:{r}_{theme}'
+                sql+=f' UPSERT {theme_id} CONTENT {quoted({"name":theme,"run_id":r})};'
+                sql+=f' RELATE OR UPDATE {node_id}->about:{r}_{kind}_{key}->{theme_id} SET run_id = {quoted(r)};'
+        if kind=='belief_revision' and p.get('belief_id'):
+            belief_key=identifier(str(p['belief_id']))
+            sql+=f' RELATE OR UPDATE {node_id}->updates:{r}_{key}->belief:{r}_{belief_key} SET run_id = {quoted(r)};'
         if kind == 'dialogue' and p.get('listener'):
             b = identifier(p['listener'])
             sql += f' RELATE OR UPDATE agent:{r}_{b}->heard:{r}_{b}_{key}->{node_id} SET run_id = {quoted(r)};' 

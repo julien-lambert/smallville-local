@@ -4,7 +4,7 @@ from __future__ import annotations
 import json,logging,signal,sys
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,parse_qs
 from smallville.settings import ROOT,load,save
 from smallville.store import Store
 from smallville.sim import Simulation
@@ -44,6 +44,11 @@ class Handler(BaseHTTPRequestHandler):
   if path=='/api/state':return self.reply(self.server.village.public())
   if path=='/api/health':return self.reply({'ok':True,'port':PORT,'bound_to':'127.0.0.1','surrealdb':self.server.village.graph.describe()})
   if path=='/api/graph':return self.reply(self.server.village.network())
+  if path=='/api/influences':return self.reply(self.server.village.influence_network())
+  if path=='/api/insight':
+   aid=parse_qs(urlsplit(self.path).query).get('agent',[''])[0]
+   try:return self.reply(self.server.village.insight(aid))
+   except ValueError:return self.reply({'error':'Agent inconnu'},404)
   if path=='/api/export':
    return self.reply(self.server.village.export(),extra={'Content-Disposition':'attachment; filename="smallville_export.json"'})
   return self.reply({'error':'Chemin introuvable'},404)

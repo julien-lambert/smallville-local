@@ -17,16 +17,17 @@
 <small class="disclosure" id="graph-queue"></small>
 </div></aside>
 <section class="center"><div class="section-bar"><div><span class="eyebrow">VILLAGE FICTIF · 1692 ALTERNATIF</span><h1>Une société sous l'emprise du soupçon</h1></div><div class="world-status"><span class="alive"></span><span id="state-label">En pause</span></div></div>
-<div class="world-wrap"><canvas id="world" width="1100" height="800" aria-label="Village avec 25 agents, une église, une mairie et une place publique"></canvas><div class="map-key"><span>● Habitants</span><span>▥ Église, mairie, marché</span><span>✦ Place des assemblées</span></div></div>
+<div class="world-wrap"><div class="map-overlay"><strong>CHRONIQUES DU VILLAGE</strong><span>Terres de Salem · 1692</span></div><canvas id="world" width="1100" height="800" aria-label="Village avec 25 agents, une église, une mairie et une place publique"></canvas><div class="map-key"><span>● Habitants</span><span>▥ Église, mairie, marché</span><span>✦ Place des assemblées</span></div></div>
 <div class="research-grid">
 <section class="research-panel" aria-label="Élections"><div class="eyebrow">CAMPAGNE & SCRUTIN</div><div id="politics" class="politics"></div></section>
-<section class="research-panel" aria-label="Graph social"><div class="row-tools"><span class="eyebrow">GRAPHE SOCIAL · RELATIONS DIRIGÉES</span><a href="/api/graph" target="_blank" rel="noopener">Données JSON</a></div><canvas id="network" width="340" height="240" aria-label="Réseau des 25 agents"></canvas><p class="network-key">Traits clairs : confiance · orangés : tensions. Clique sur un nœud.</p></section>
+<section class="research-panel" aria-label="Graph social"><div class="row-tools"><span class="eyebrow">RÉSEAU · CONFIANCE & RUMEURS</span><button id="network-mode" type="button">Voir les transmissions</button><a href="/api/graph" target="_blank" rel="noopener">Données JSON</a></div><canvas id="network" width="340" height="240" aria-label="Réseau des 25 agents"></canvas><p class="network-key">Traits clairs : confiance · orangés : tensions. Clique sur un nœud.</p></section>
 </div>
+<section class="research-panel insight-panel"><div class="row-tools"><span class="eyebrow">ARCHIVES VIVANTES · MÉMOIRE RELATIONNELLE</span><button id="insight-refresh" type="button">Actualiser les traces</button></div><div id="insight-panel" class="insight-grid"><p>Sélectionne un habitant pour examiner les sources de ses croyances et ses souvenirs pertinents.</p></div></section>
 <div class="timeline-heading"><span class="eyebrow">CHRONIQUE DE LA SOCIÉTÉ</span><div class="row-tools"><span id="pending">0 tâche</span><button id="export">Exporter le corpus JSON</button></div></div>
 <div id="events" class="events"></div></section>
 <aside class="inspector"><div class="pane-head"><span class="eyebrow">INDIVIDU & CONTEXTE</span><span class="count">Vue subjective</span></div>
 <div id="profile" class="profile"></div>
-<div class="tabs"><button data-tab="mind" class="active">Psyché</button><button data-tab="memory">Mémoire</button><button data-tab="belief">Croyances</button><button data-tab="relation">Relations</button></div>
+<div class="tabs"><button data-tab="mind" class="active">Psyché</button><button data-tab="memory">Mémoire</button><button data-tab="belief">Croyances</button><button data-tab="relation">Relations</button><button data-tab="trail">Traces</button></div>
 <div id="inspector-content" class="inspector-body"></div>
 <div class="inject"><label for="whisper">Introduire une croyance ou une information</label>
 <div class="inject-controls"><select id="inject-mode"><option value="information">Information communiquée</option><option value="belief">Croyance suggérée</option></select><select id="inject-scope"><option value="individual">À cet habitant</option><option value="public">Annonce à tous</option></select></div>

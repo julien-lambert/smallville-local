@@ -16,6 +16,7 @@ from .seed import WIDTH, HEIGHT, WORLD_VERSION, SECRETS, ANNOUNCEMENT, PLACES, m
 from .models import LocalBrain
 from .jev import Jev, decide
 from .graph import GraphBridge
+from .graph_memory import GraphMemory
 from .society import clamp, election, psyche
 from .mind import ensure_mind, emotion_decay, arousal, category, apply_appraisal
 
@@ -56,6 +57,7 @@ class Simulation:
         self.store.set_run(self.state['run_id'])
         for a in self.state['agents'].values():ensure_mind(a)
         self.cognition=LocalBrain(cfg);self.jev=Jev(store,cfg);self.graph=GraphBridge(store)
+        self.graph_memory=GraphMemory(self.graph,store)
         self.tasks=queue.Queue(maxsize=18)
         self.judgment_tasks=queue.Queue(maxsize=70)
         self.judgment_pending=set()
@@ -197,6 +199,8 @@ class Simulation:
                'role':self.state['agents'][cid]['role'],
                'goal':self.state['agents'][cid]['goal']} for cid in p['candidates']]
         relevant=self._memories(aid,trigger+' foi preuves élections survie',minute)
+        memory_graph=self.graph_memory.context(self.state['run_id'],aid,trigger,minute,a.get('salience'))
+        public['memoire_relationnelle']=str(memory_graph)[:1150]
         all_beliefs=self.store.beliefs(aid,45)
         # Une croyance réellement susceptible de changer, pas toujours l'annonce publique.
         selected=sorted(all_beliefs,key=lambda b:(
@@ -359,7 +363,7 @@ class Simulation:
             rel=copy.deepcopy(self.state['relations'][aid][other]);minute=self.state['minute'];run_id=self.state['run_id']
         memories=self._memories(aid,b['name']+' '+topic,minute)
         beliefs=self.store.beliefs(aid,15)
-        graph_info=self.graph.neighborhood(run_id,aid) if self.graph.status=='connecté' else {}
+        graph_info=self.graph_memory.context(run_id,aid,topic+' '+b['name'],minute,a.get('salience'))
         ctx={'topic':topic,'time':{'minute':minute,'day':minute//1440+1},
              'memories':[x['content'] for x in memories],
              'beliefs':[{'proposition':x['proposition'],'confidence':round(x['confidence'],2)} for x in beliefs[:8]],
@@ -374,7 +378,7 @@ class Simulation:
              'political_priority':a.get('political_priority',''),
              'traits':{**a['traits'],**{k:a[k] for k in ('religiosity','credulity','reasoning','aggression','suspicion','tolerance')}},
              'resources':{'provisions':a['provisions'],'coins':a['coins']},
-             'graph_neighborhood':str(graph_info)[:450],
+             'graph_neighborhood':graph_info,
              'stance':'curious'}
         return a,b,rel,memories,beliefs,ctx
 
@@ -519,6 +523,9 @@ class Simulation:
                     self.store.memory(bid,minute,'entendu_en_groupe',f"{a['name']} a dit : {txt}",.65,aid)
                     self.state['agents'][bid]['experiences']['social']+=1
                     if shared:self._diffuse(aid,bid,shared,minute,group=True)
+                    # Une assemblée peut déclencher une nouvelle appréciation Jev
+                    # sans forcer d'appel si un quota ou un cooldown est atteint.
+                    if shared:self._schedule_judgment(bid,'assemblée',minute,force=True)
                 self.store.save(self.state)
 
     def _daily_economy(self,minute):
@@ -600,6 +607,8 @@ class Simulation:
     def _reflect(self,aid,minute,epoch):
         with self.lock:a=copy.deepcopy(self.state['agents'][aid])
         memories=self._memories(aid,'expériences politiques',minute)
+        a['graph_context']=self.graph_memory.context(self.state['run_id'],aid,
+             'expériences politiques conatus et croyances',minute,a.get('salience'))
         reflection,model,error,latency=self.cognition.reflect(a,memories)
         if epoch!=self.epoch:return
         self.store.memory(aid,minute,'reflexion_approfondie',reflection,.84,'introspection')
@@ -660,6 +669,24 @@ class Simulation:
                   'beliefs':self.store.beliefs(aid,18),
                   'belief_history':self.store.belief_history(aid,18)} for aid in s['agents']}
             return s
+
+    def insight(self,aid):
+        """Graphe de mémoire et pistes de preuve consultables par le chercheur."""
+        with self.lock:
+            if aid not in self.state['agents']:raise ValueError('Agent inconnu')
+            a=copy.deepcopy(self.state['agents'][aid]);minute=self.state['minute']
+            r=self.state['run_id']
+            related=copy.deepcopy(self.state['relations'][aid])
+        context=self.graph_memory.context(r,aid,
+            'religion preuves election maire faim survie soupçon',minute,a.get('salience'))
+        context['agent']=aid
+        context['relations']=[{'agent':k,'confiance':v['trust'],'tension':v['tension']}
+             for k,v in sorted(related.items(),key=lambda x:-x[1]['familiarity'])[:8]]
+        return context
+
+    def influence_network(self):
+        with self.lock:r=self.state['run_id']
+        return self.graph_memory.observer_influences(r)
 
     def network(self):
         with self.lock:
