@@ -196,3 +196,28 @@ progressivement. Aucune modification de `.env` ni réinstallation n'est requise.
 ## Diagnostic Jev certifié (TLS)
 
 Exécuter `./Installer.command` pour installer `truststore` et `certifi` dans `.venv`, sans toucher à `.env`. Exécuter ensuite `./VerifierJev.command`. La vérification initiale du certificat TLS n'utilise **aucune requête payante**. L'option explicite de test envoie **une seule** requête Jev avec le budget SQLite habituel. Aucun certificat n'est ignoré, aucune clé n'est imprimée, aucune autre API cloud n'est utilisée. En cas d'échec, le diagnostic affiche l'erreur à transmettre (sans partager la clé).
+
+
+## V7 : audit causal, projets visibles et corpus scientifique enrichi
+
+L'onglet **Projets** présente un plan réellement maintenu : étape active, lieu prévu,
+rendez-vous et échec éventuel. Une simple intention ne constitue pas une action réussie.
+
+Le mensonge est distingué de la rumeur sincère. Le système conserve la croyance
+privée et l'affirmation publique ; il n'injecte pas dans la mémoire de l'auditeur
+la croyance privée contradictoire. Une assemblée ne diffuse plus automatiquement
+une proposition qui n'a pas été effectivement exprimée.
+
+SurrealDB reçoit désormais des nœuds `project` et `decision_trace`. Le corpus
+`/api/export` inclut l'historique des croyances, les journaux des modèles,
+les réponses typées Jev et les traces avant/après des décisions, sans secrets
+d'authentification ni prompts HTTP complets. Les futurs imaginés sont toujours
+signalés comme hypothèses, jamais comme souvenirs factuels.
+
+Les décès exceptionnels n'ajoutent aucun électeur ni bénéficiaire fictif. Le grenier
+ne crédite une ration à un agent que lorsque le stock diminue réellement.
+Le modèle Apple reçoit le projet courant pour maintenir la continuité narrative.
+
+Tests : `python3 -m unittest discover -s tests -v` ;
+vérification JavaScript : `node --check static/app.js`.
+Les essais Jev réels sont facultatifs et budgetés : `./VerifierJev.command`.

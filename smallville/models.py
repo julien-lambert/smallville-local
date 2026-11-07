@@ -66,6 +66,8 @@ class Apple:
        'salience':a.get('salience'),'intention':a.get('intention'),
        'priorite_politique':a.get('political_priority'),
        'dernier_jugement':a.get('mental_trace'),
+       'mon_projet_persistant':a.get('executive',{}).get('project'),
+       'hypotheses_non_factuelles':a.get('executive',{}).get('future_scenarios',[])[:2],
        'graphe_memoriel':str(a.get('graph_context') or '')[:1400]},ensure_ascii=False)),450)
 
 class MLX:

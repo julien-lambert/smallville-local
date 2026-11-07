@@ -11,8 +11,8 @@ ROOT=pathlib.Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from smallville.store import Store
 from smallville.graph import GraphBridge,quoted,identifier
 
-NODE_TABLES=('agent','memory','belief','dialogue','event','ballot','assembly','reflection','state','relation_change')
-EDGE_TABLES=('knows','remembers','holds','heard','uttered','influenced','voted_for','casts','attends','acts_in','reflects_on','experienced','relates')
+NODE_TABLES=('agent','memory','belief','dialogue','event','ballot','assembly','reflection','state','relation_change','project','decision_trace','belief_revision','theme')
+EDGE_TABLES=('knows','remembers','holds','heard','uttered','influenced','voted_for','casts','attends','acts_in','reflects_on','experienced','relates','about','updates','pursues','decided','revised')
 
 
 def main():

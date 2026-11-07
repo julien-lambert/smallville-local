@@ -24,7 +24,7 @@ function renderUI(){if(!world)return;const w=world,st=w.status,b=st.jev_budget;
 }
 function buildAgents(){const target=$('agents'),prev=target.scrollTop;empty(target);Object.values(world.agents).forEach(a=>{
  const b=el('button',{class:'agent-button'+(a.id===selected?' active':''),'aria-label':'Inspecter '+a.name});const p=el('span',{class:'portrait'},a.name[0]);p.style.background=a.color;const t=el('span');t.append(el('strong',{},a.name),el('small',{},a.role));b.append(p,t);b.onclick=()=>{selected=a.id;insightFetchedAt=0;renderUI()};target.append(b)});target.scrollTop=prev}
-function labelActivity(s){return ({walking:'En marche',talking:'En conversation',working:'Travaille',resting:'Se repose',socialising:'Cherche du monde',observing:'Observe',seeking_food:'Cherche du pain',seeking_safety:'Cherche refuge',campaigning:'Campagne',praying:'Prière',investigating:'Recherche de preuves'})[s]||s}
+function labelActivity(s){return ({deceased:'Décédé',detained:'En détention',planning:'Planifie',negotiating:'Négocie',protesting:'Proteste',trading:'Échange',organizing:'Organise',shopping:'Approvisionnement',walking:'En marche',talking:'En conversation',working:'Travaille',resting:'Se repose',socialising:'Cherche du monde',observing:'Observe',seeking_food:'Cherche du pain',seeking_safety:'Cherche refuge',campaigning:'Campagne',praying:'Prière',investigating:'Recherche de preuves'})[s]||s}
 function buildProfile(){const a=world.agents[selected];if(!a)return;const p=$('profile');empty(p);const top=el('div',{class:'profile-top'}),portrait=el('span',{class:'portrait'},a.name[0]);portrait.style.background=a.color;const title=el('div');title.append(el('h2',{},a.name),el('p',{},a.role+' · '+labelActivity(a.activity)));top.append(portrait,title);p.append(top,el('p',{class:'bio'},a.bio),el('div',{class:'thought'},'« '+(a.thought||'Je réfléchis.')+' »'))}
 function meter(node,label,value){const row=el('div',{class:'trait'}),head=el('div');head.append(el('span',{},label),el('strong',{},`${Math.round(value*100)} %`));const track=el('div',{class:'track'}),fill=el('div',{class:'fill'});fill.style.width=`${Math.max(0,Math.min(100,value*100))}%`;track.append(fill);row.append(head,track);node.append(row)}
 function buildInspector(){const a=world.agents[selected];if(!a)return;const p=$('inspector-content');empty(p);const individual=world.individual[selected]||{memories:[],beliefs:[]};
@@ -38,6 +38,25 @@ function buildInspector(){const a=world.agents[selected];if(!a)return;const p=$(
   p.append(el('p',{},a.goal),el('p',{class:'values'},`Décisions Jev : ${a.decisions||0} · Révisions : ${a.revision_count||0} · Intention : ${a.intention||'observe'} · Valeur : ${a.political_priority||'—'}`),el('p',{},a.mental_trace||'Aucun jugement Jev enregistré.'))}
  else if(tab==='memory'){p.append(el('div',{class:'section-label'},'SOUVENIRS AUTOBIOGRAPHIQUES'));if(!individual.memories.length)p.append(el('p',{},'Aucun souvenir.'));individual.memories.forEach(m=>{const e=el('div',{class:'memory-item'});e.append(el('small',{},`${clock(m.minute)} · ${m.kind} · importance ${Math.round(100*m.importance)} %`),el('p',{},m.content));p.append(e)})}
  else if(tab==='belief'){p.append(el('div',{class:'section-label'},'CROYANCES SUBJECTIVES'));individual.beliefs.forEach(b=>{const e=el('div',{class:'memory-item'});e.append(el('small',{},`Source : ${b.source||'inconnue'} · ${clock(b.minute)}`));const line=el('div',{class:'belief-bar'});line.append(el('p',{},b.proposition),el('strong',{},Math.round(b.confidence*100)+' %'));e.append(line);p.append(e)});p.append(el('div',{class:'section-label'},'HISTORIQUE DES RÉVISIONS'));(individual.belief_history||[]).slice(0,12).forEach(b=>{const d=el('div',{class:'memory-item'});d.append(el('small',{},`${clock(b.minute)} · ${b.source||'inconnue'}`),el('p',{},`${b.before==null?'nouvelle croyance':Math.round(b.before*100)+' %'} → ${Math.round(b.after*100)} % : ${b.proposition}`));p.append(d)})}
+ else if(tab==='agenda'){
+  const ex=a.executive||{};const project=ex.project;
+  p.append(el('div',{class:'section-label'},'PROJET ACTIF & ENGAGEMENTS'));
+  if(!a.alive)p.append(el('p',{},'Personnage décédé.'));
+  if(!project)p.append(el('p',{},'Aucun projet actif.'));
+  else{
+   p.append(el('h3',{},project.objective),el('p',{class:'values'},'Statut : '+project.status+' · Origine : '+project.origin+' · Échéance : '+clock(project.deadline)));
+   (project.steps||[]).forEach((step,i)=>{
+    const card=el('div',{class:'memory-item'});
+    card.append(el('small',{},'Étape '+(i+1)+' · '+step.status+' · '+clock(step.due)),
+                el('p',{},step.action+' — '+step.place+(step.target?' · '+(world.agents[step.target]?.name||step.target):'')));
+    p.append(card);
+   });
+  }
+  p.append(el('div',{class:'section-label'},'FUTURS IMAGINÉS — NON FACTUELS'));
+  (ex.future_scenarios||[]).forEach(f=>p.append(el('p',{},f.if+' → '+f.then)));
+  p.append(el('div',{class:'section-label'},'PROJETS PRÉCÉDENTS'));
+  (ex.history||[]).slice(-6).forEach(pr=>p.append(el('p',{},pr.kind+' · '+pr.status+' · '+(pr.reason_closed||'terminé'))));
+ }
  else if(tab==='trail'){p.append(el('div',{class:'section-label'},'PROVENANCE & CHAÎNES DE CROYANCES'));if(insightAgent!==selected||!insightData){p.append(el('p',{},'Chargement des archives...'))}else{p.append(el('p',{class:'values'},'Mémoire : '+insightData.origine));for(const b of insightData.croyances||[]){const e=el('div',{class:'memory-item'});e.append(el('small',{},`Source : ${b.source_declaree} · confiance ${Math.round(b.confiance*100)} %`),el('p',{},b.proposition));for(const c of b.evolution||[])e.append(el('small',{},`${c.avant==null?'nouvelle':Math.round(c.avant*100)+' %'} → ${Math.round(c.apres*100)} % · ${c.cause}`));p.append(e)}}}
  else{p.append(el('div',{class:'section-label'},'RELATIONS DIRIGÉES'));Object.entries(world.relations[selected]).sort((a,b)=>b[1].trust-a[1].trust).forEach(([id,r])=>{const e=el('div',{class:'memory-item'});e.append(el('div',{class:'section-label'},world.agents[id].name));for(const k of ['trust','affinity','tension','familiarity'])meter(e,{trust:'Confiance',affinity:'Affinité',tension:'Tension',familiarity:'Familiarité'}[k],r[k]);p.append(e)})}}
 function buildPolitics(){const p=$('politics');empty(p);const poll=world.politics,r=world.resources;
@@ -45,7 +64,7 @@ function buildPolitics(){const p=$('politics');empty(p);const poll=world.politic
  if(poll.phase==='campaign'){
   p.append(el('p',{},`Scrutin prévu : ${clock(poll.election_minute)} (dans ${Math.max(0,poll.election_minute-world.minute)} minutes simulées).`));
   p.append(el('p',{},`${poll.candidates.map(id=>world.agents[id]?.name||id).join(', ')} sont candidats.`));
-  p.append(el('p',{class:'safety-law'},'Charte : aucun meurtre ni exécution, même en période de panique.'));
+  p.append(el('p',{class:'safety-law'},'Charte : meurtre et exécution interdits. La loi n’empêche pas toute transgression.'));
  }else{const result=poll.result;
   p.append(el('h3',{},`Élue ou élu : ${world.agents[result.mayor].name}`));
   p.append(el('p',{},`${result.turnout}/25 suffrages · ${result.total} écus distribués · ${clock(result.minute)}`));

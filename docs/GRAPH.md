@@ -119,3 +119,13 @@ Les analyses du graphe sont volontairement séparées du dossier subjectif d'un
 agent, afin qu'aucun personnage ne découvre automatiquement des secrets qu'il
 n'a jamais entendus. Si le serveur SurrealDB n'a pas encore ingéré son outbox,
 la récupération est complétée par les données SQLite actuelles.
+
+
+## V7 : couche de décisions et futurs anticipés
+
+`project` représente un projet individuel avec phases, échéance et historique ;
+`decision_trace` associe un jugement Jev (sans clé API) au contexte sélectionné,
+à l'état du personnage avant et après, et à son plan actif. Les arêtes
+`pursues` et `decided` les rattachent à l'agent et à son `run_id`.
+Les pensées imaginaires ne sont pas des événements matériels. Les données de
+`cognitive_trace` demeurent conservées dans SQLite après un reset du monde.

@@ -19,6 +19,8 @@ CREATE INDEX IF NOT EXISTS ix_graph_pending ON graph_outbox(synced,id);
 CREATE TABLE IF NOT EXISTS ballots(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, minute INTEGER, voter TEXT, candidate TEXT, allocation TEXT, rationale TEXT);
 CREATE TABLE IF NOT EXISTS assemblies(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, minute INTEGER, participants TEXT, topic TEXT);
 CREATE TABLE IF NOT EXISTS graph_bootstrap(run_id TEXT PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS cognitive_trace(id INTEGER PRIMARY KEY AUTOINCREMENT,run_id TEXT,minute INTEGER,agent TEXT,kind TEXT,payload TEXT);
+CREATE INDEX IF NOT EXISTS ix_cognitive_run ON cognitive_trace(run_id,minute,agent);
 '''
 class Store:
  def __init__(self,path=None):
@@ -130,6 +132,12 @@ class Store:
        'data':{'minute':minute,'participants':participants,'topic':topic[:400]}})
  def ballots(self):return self.all('SELECT * FROM ballots ORDER BY id DESC')
  def assemblies(self):return self.all('SELECT * FROM assemblies ORDER BY id DESC')
+ def cognitive_trace(self,agent,minute,kind,body):
+    with self.lock,self.connection() as c:
+      cur=c.execute('INSERT INTO cognitive_trace(run_id,minute,agent,kind,payload) VALUES(?,?,?,?,?)',
+          (self.run_id,minute,agent,kind,json.dumps(body,ensure_ascii=False)))
+      self._queue(c,'decision_trace',{'id':str(cur.lastrowid),'agent':agent,
+          'data':{'minute':minute,'kind':kind,'summary':body}})
  def log_model(self,minute,aid,task,model,latency,error=None):
     self.execute('INSERT INTO model_log(minute,agent,task,model,latency,error) VALUES(?,?,?,?,?,?)',(minute,aid,task,model,float(latency),str(error)[:300] if error else ''))
  def ledger(self):return self.all('SELECT id,minute,day,t,status,reserved,amount,tokens,error FROM jev_ledger ORDER BY id DESC')

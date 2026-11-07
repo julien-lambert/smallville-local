@@ -60,6 +60,8 @@ class Simulation:
         self.store.set_run(self.state['run_id'])
         for a in self.state['agents'].values():
             ensure_mind(a);executive.ensure(a)
+        self.state['laws'].update({'murder_forbidden':True,'executions_forbidden':True,
+            'violent_actions_forbidden':False,'murder_physically_possible':True})
         self.cognition=LocalBrain(cfg);self.jev=Jev(store,cfg);self.graph=GraphBridge(store)
         self.graph_memory=GraphMemory(self.graph,store)
         self.tasks=queue.Queue(maxsize=18)
@@ -146,6 +148,16 @@ class Simulation:
             if self.cfg.get('jev_enabled') and (minute+sum(ord(c) for c in a['id']))%19==0:
                 self._schedule_judgment(a['id'],'routine',minute)
             if ([a['x'],a['y']]==a['destination'] and minute>=a['stay_until']) or minute-a['last_plan']>150:
+                if a.get('executive',{}).get('project',{}):
+                    project=a['executive']['project']
+                    if (project and project['kind']=='survival' and
+                            [a['x'],a['y']]==list(PLACES['grenier']) and
+                            s['resources']['granary']>0 and
+                            minute-a.get('last_food_pickup',-99999)>300):
+                        s['resources']['granary']-=1;a['provisions']+=1
+                        a['last_food_pickup']=minute
+                        self.store.event(minute,'food_aid',a['id'],None,
+                            f"{a['name']} reçoit une ration du grenier.",{'rations':1})
                 outcome=executive.progress_on_site(a,s,minute)
                 if outcome:self._record_project(a,outcome,minute)
                 self._plan(a,rng,minute)
@@ -176,7 +188,7 @@ class Simulation:
         """Ordonnanceur non bloquant : 25 esprits, un seul moteur Jev partagé."""
         if not self.cfg.get('jev_enabled') or not self.jev.key:return False
         a=self.state['agents'].get(aid)
-        if not a or aid in self.judgment_pending or self.judgment_tasks.full():return False
+        if not a or not a.get('alive',True) or aid in self.judgment_pending or self.judgment_tasks.full():return False
         if not force and minute-a.get('last_jev_attempt',-99999)<95:return False
         # Une nouvelle information est plus saillante qu'un cycle routinier.
         if force and minute-a.get('last_jev_attempt',-99999)<18:return False
@@ -276,6 +288,13 @@ class Simulation:
                         f"confiance {rev['before']:.2f} → {rev['after']:.2f}.",.84,'introspection')
                     self.store.event(self.state['minute'],'belief_revision',aid,None,
                         f"{current['name']} reconsidère une croyance.",{'revision':rev})
+            self.store.cognitive_trace(aid,self.state['minute'],'jev_appraisal',{
+                'trigger':trigger,'before':outcome['before'],'after':outcome['after'],
+                'memories_selected':[{'content':m.get('content','')[:180],
+                                      'source':m.get('source'),'minute':m.get('minute')} for m in relevant[:6]],
+                'beliefs_selected':beliefs[:7],'answers':answers,
+                'project':copy.deepcopy(current.get('executive',{}).get('project')),
+                'decision':current['intention'],'worldview':current['worldview']})
             self.store.memory(aid,self.state['minute'],'intention',
                 f"{current['mental_trace']} (motif : {trigger})",.68,'jugement Jev')
             self.store.event(self.state['minute'],'jev_mind',aid,None,
@@ -316,7 +335,10 @@ class Simulation:
 
     def _campaign(self,rng,minute):
         if minute%60!=0:return
-        candidate=rng.choice(self.state['politics']['candidates'])
+        active=[c for c in self.state['politics']['candidates']
+                if self.state['agents'][c].get('alive',True)]
+        if not active:return
+        candidate=rng.choice(active)
         a=self.state['agents'][candidate]
         self.store.event(minute,'campaign',candidate,None,
             f"{a['name']} ({a['role']}) promet de défendre : {a['goal']}")
@@ -464,6 +486,10 @@ class Simulation:
         if shared and executive.ensure(self.state['agents'][aid]).get('tactic')=='withhold':
             shared=None
         topic=shared['proposition'] if shared else 'le scrutin et l’avenir de la communauté'
+        ex=executive.ensure(self.state['agents'][aid]);project=ex.get('project')
+        if project and project.get('target')==bid:
+            topic=project['objective']+' (je souhaite en parler avec toi)'
+            shared=None
         a,b,rel,mem,beliefs,ctx=self._ctx(aid,bid,topic)
         strategy=deception(a,shared,bid,minute)
         if strategy:
@@ -478,8 +504,10 @@ class Simulation:
         if epoch!=self.epoch:return
         self._utter(aid,bid,first,minute,model)
         listener,speaker,relation,m,beliefs,ctx2=self._ctx(bid,aid,topic)
+        spoken=(dict(shared,proposition=strategy['reported_claim'],confidence=.30)
+                if strategy else shared)
         answers,error=self.jev.judge(minute,listener,speaker,first,relation,m,beliefs,
-            topic=shared['proposition'] if shared else None)
+            topic=spoken['proposition'] if spoken else None)
         result=decide(answers,listener,relation)
         with self.lock:
             if epoch!=self.epoch:return
@@ -499,13 +527,16 @@ class Simulation:
             other['experiences']['negative' if result['mood_delta']<0 else 'positive']+=1
             # Une croyance ne peut être acquise sans communication réelle.
             communicated = (float((answers.get('claim_expressed') or {}).get('noul',0)) >= .70
-                            if answers else explicitly_shared(first,shared['proposition'])) if shared else False
-            if shared and communicated:
-                self._diffuse(aid,bid,shared,minute)
+                            if answers else explicitly_shared(first,spoken['proposition'])) if spoken else False
+            if spoken and communicated:
+                self._diffuse(aid,bid,spoken,minute)
+                if strategy:
+                    self.store.memory(bid,minute,'témoignage',
+                        f"{a['name']} a affirmé : {strategy['reported_claim']}",.6,aid)
                 if answers:
                     # Nuancer la confiance selon les éléments perçus, sans transformer une parole en vérité.
                     support=float(answers.get('claim_supported',{}).get('noul',.5))
-                    if support<.25:
+                    if support<.25 and not strategy:
                         current_beliefs={x['proposition']:x for x in self.store.beliefs(bid,60)}
                         old=current_beliefs.get(topic)
                         if old:
@@ -577,6 +608,7 @@ class Simulation:
         s=self.state;r=s['resources'];agents=s['agents']
         # Causalité matérielle : nourriture, salaire, dépenses, monnaie conservée.
         for a in agents.values():
+            if not a.get('alive',True):continue
             if a['provisions']>0:
                 a['provisions']-=1;a['hunger']=limit(a['hunger']-.36)
             elif r['granary']>0 and a['coins']>=r['food_price']:
@@ -760,5 +792,9 @@ class Simulation:
               'events':self.store.all('SELECT * FROM events ORDER BY id'),
               'dialogues':self.store.all('SELECT * FROM dialogues ORDER BY id'),
               'ballots':self.store.ballots(),'assemblies':self.store.assemblies(),
+              'belief_history':self.store.all('SELECT * FROM belief_history ORDER BY id'),
+              'model_log':self.store.all('SELECT * FROM model_log ORDER BY id'),
+              'cognitive_trace':self.store.all('SELECT * FROM cognitive_trace ORDER BY id'),
+              'jev_responses':self.store.all('SELECT id,minute,status,amount,tokens,response,error FROM jev_ledger ORDER BY id'),
               'graph':self.network(),'jev_budget':self.store.budget(self.cfg),
               'excluded':'API keys, HTTP Jev prompts, SurrealDB password'}
