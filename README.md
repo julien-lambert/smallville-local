@@ -172,3 +172,22 @@ lancer une seule fois `./Installer.command` puis `./Lancer.command`.
 La nouvelle direction artistique est implémentée en code, mais doit être évaluée
 visuellement dans un navigateur sur Mac : une validation pixel-par-pixel du rendu
 n'a pas été possible dans l'environnement de test.
+
+### SurrealDB affiche « hors ligne » alors que `/health` répond
+
+Les versions antérieures au correctif de bootstrap n'initialisaient pas le
+namespace `smallville` et la base `society` : la première requête SQL échouait
+avec `The namespace 'smallville' does not exist`, bien que SurrealDB ait démarré.
+Le démarrage V4.1 crée désormais ces deux ressources automatiquement par une
+requête root locale **sans** en-têtes `Surreal-NS` et `Surreal-DB`, puis vérifie
+la connexion normale. L'opération utilise `IF NOT EXISTS` : elle ne supprime
+aucune donnée existante. La file SQLite `graph_outbox` reprend ensuite son
+transfert vers le graphe ; une file de plusieurs milliers d'événements peut
+prendre un moment à se vider. Vérification :
+
+```bash
+curl -s http://127.0.0.1:8000/api/health | python3 -m json.tool
+```
+
+La valeur `surrealdb.status` doit devenir `connecté` ; `pending` diminue
+progressivement. Aucune modification de `.env` ni réinstallation n'est requise.

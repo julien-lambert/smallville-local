@@ -143,6 +143,39 @@ class SocietyCase(unittest.TestCase):
         again,error=self.sim.jev.judge(501,a,b,'Encore.',{},[],[])
         self.assertIsNone(again);self.assertIn('Délai',error)
 
+    def test_surreal_bootstrap_creates_missing_namespace_without_scoped_headers(self):
+        """Régression : /health OK mais 'namespace smallville does not exist'."""
+        from smallville.graph import GraphBridge
+        import json
+        bridge = GraphBridge(self.store)
+        bridge.password = 'test-only-not-real'
+        requests = []
+        class Response:
+            def __init__(self, result): self.result = result
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self, n): return json.dumps(self.result).encode('utf-8')
+        class FakeOpener:
+            def open(self, req, timeout=0):
+                body = req.data.decode('utf-8')
+                requests.append((body, dict(req.header_items())))
+                headers = {k.lower():v for k,v in req.header_items()}
+                if body.startswith('DEFINE NAMESPACE'):
+                    assert 'surreal-ns' not in headers
+                    assert 'surreal-db' not in headers
+                    assert 'DEFINE DATABASE IF NOT EXISTS society' in body
+                    return Response([{'status':'OK','result':None} for _ in range(3)])
+                assert headers.get('surreal-ns') == 'smallville'
+                assert headers.get('surreal-db') == 'society'
+                return Response([{'status':'OK','result':True}])
+        bridge.opener = FakeOpener()
+        bridge.bootstrap()
+        self.assertTrue(bridge.initialized)
+        self.assertEqual(bridge.status, 'synchronisation')
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(bridge.flush(0), 0)
+        self.assertEqual(bridge.status, 'connecté')
+
     def test_surreal_graph_escaping_and_outbox(self):
         s=statement('belief',{'run_id':'test123','id':'1','agent':'alice','source':'basile',
            'data':{'proposition':'"; DELETE agent; --','confidence':.32,'minute':500}})

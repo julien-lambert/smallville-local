@@ -100,16 +100,24 @@ class GraphBridge:
         self.synced = 0
         self.closed = threading.Event()
         self.thread = None
+        self.initialized = False
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def query(self, sql, timeout=2):
+    def _post_sql(self, sql, timeout=2, scoped=True):
+        """Envoie du SurrealQL local ; scoped=False pour le bootstrap root.
+
+        La première requête ne peut PAS inclure les en-têtes Surreal-NS/DB :
+        la base n'existe pas encore lors de la toute première installation.
+        """
         if not self.password:
             raise RuntimeError('Identifiants SurrealDB absents : lancer Installer.command')
         auth = base64.b64encode(f'{self.user}:{self.password}'.encode()).decode()
-        req = urllib.request.Request(HOST+'/sql', data=sql.encode('utf-8'), method='POST', headers={
-            'Authorization':'Basic '+auth,
-            'Surreal-NS':_NS,'Surreal-DB':_DB,
-            'Content-Type':'text/plain','Accept':'application/json'})
+        headers = {'Authorization':'Basic '+auth,
+                   'Content-Type':'text/plain','Accept':'application/json'}
+        if scoped:
+            headers.update({'Surreal-NS':_NS, 'Surreal-DB':_DB})
+        req = urllib.request.Request(HOST+'/sql', data=sql.encode('utf-8'),
+                                     method='POST', headers=headers)
         with self.opener.open(req, timeout=timeout) as reply:
             response = json.loads(reply.read(4000000))
         if not isinstance(response, list):
@@ -118,6 +126,28 @@ class GraphBridge:
             if item.get('status') != 'OK':
                 raise RuntimeError(str(item.get('result','SurrealQL en erreur'))[:240])
         return response
+
+    def query(self, sql, timeout=2):
+        """Requête dans la base de la simulation, une fois créée."""
+        return self._post_sql(sql, timeout=timeout, scoped=True)
+
+    def bootstrap(self):
+        """Création idempotente du namespace et de la database, sans perte de données.
+
+        Une requête root non scindée initialise les ressources une seule fois :
+        les versions récentes de SurrealDB refusent parfois d'utiliser un
+        namespace absent alors que le serveur /health est opérationnel.
+        """
+        self._post_sql(
+            f'DEFINE NAMESPACE IF NOT EXISTS {_NS}; '
+            f'USE NS {_NS}; '
+            f'DEFINE DATABASE IF NOT EXISTS {_DB};',
+            timeout=8, scoped=False)
+        # Vérifier que les en-têtes de portée sont désormais acceptés.
+        self.query('RETURN true;', timeout=3)
+        self.initialized = True
+        self.status = 'synchronisation'
+        self.last_error = ''
 
     def flush(self, max_items=35):
         rows = self.store.outbox(max_items)
@@ -142,11 +172,17 @@ class GraphBridge:
     def _loop(self):
         while not self.closed.is_set():
             try:
+                if not self.initialized:
+                    self.bootstrap()
                 count=self.flush()
                 self.closed.wait(.06 if count else 3)
             except Exception as exc:
                 self.status='hors ligne'
                 self.last_error=f'{type(exc).__name__}: {str(exc)[:160]}'
+                # Après redémarrage de SurrealDB ou changement du stockage,
+                # recommencer le bootstrap (sans recréer les données existantes).
+                if 'does not exist' in str(exc).lower():
+                    self.initialized = False
                 self.closed.wait(4)
 
     def close(self):
