@@ -15,7 +15,7 @@ FILES={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/style.cs
 MIMES={'html':'text/html; charset=utf-8','js':'application/javascript; charset=utf-8','css':'text/css; charset=utf-8'}
 
 class Handler(BaseHTTPRequestHandler):
- server_version='SmallvilleLocal/1.0'
+ server_version='SmallvilleLocal/2.0'
  def log_message(self,format,*args):
   # Ne pas consigner de corps de requêtes ou de secrets.
   if not self.path.startswith('/api/state'):
@@ -42,7 +42,8 @@ class Handler(BaseHTTPRequestHandler):
    if not file.is_file():return self.reply({'error':'Fichier absent'},404)
    return self.reply(file.read_bytes(),mime=MIMES[file.suffix.lstrip('.')])
   if path=='/api/state':return self.reply(self.server.village.public())
-  if path=='/api/health':return self.reply({'ok':True,'port':PORT,'bound_to':'127.0.0.1'})
+  if path=='/api/health':return self.reply({'ok':True,'port':PORT,'bound_to':'127.0.0.1','surrealdb':self.server.village.graph.describe()})
+  if path=='/api/graph':return self.reply(self.server.village.network())
   if path=='/api/export':
    return self.reply(self.server.village.export(),extra={'Content-Disposition':'attachment; filename="smallville_export.json"'})
   return self.reply({'error':'Chemin introuvable'},404)
@@ -75,7 +76,11 @@ class Handler(BaseHTTPRequestHandler):
     self.server.store.event(app.state['minute'],'settings',None,None,
        'Jev '+('activé explicitement' if enabled else 'désactivé'))
     return self.reply({'ok':True,'jev_enabled':enabled})
-   if path=='/api/whisper':return self.reply(app.give_information(str(data.get('agent','')),str(data.get('text',''))))
+   if path in ('/api/whisper','/api/inject'):
+    return self.reply(app.give_information(str(data.get('agent','')),str(data.get('text','')),
+       str(data.get('mode','information')),str(data.get('scope','individual'))))
+   if path=='/api/advance':
+    return self.reply({'ok':True,'minute':app.advance(int(data.get('minutes',60)))})
    if path=='/api/reset':
     if data.get('confirm')!='RESET':raise ValueError('Confirmation RESET exigée')
     app.pause(True);app.reset();return self.reply({'ok':True,'jev_ledger_preserved':True})
@@ -102,7 +107,7 @@ def main():
  print('\nSmallville Local — serveur prêt : http://127.0.0.1:8000',flush=True)
  print(f'Cognition : {village.cognition.name} — {village.cognition.reason}',flush=True)
  print(f'Clé Jev : {"présente" if village.jev.key else "absente"} | Jev : DÉSACTIVÉ au démarrage',flush=True)
- print(f'Budget application Jev : ${cfg["jev_budget_usd"]:.2f} | appuie sur Ctrl+C pour arrêter\n',flush=True)
+ print(f'Budget application Jev : ${cfg["jev_budget_usd"]:.2f} | SurrealDB local : 127.0.0.1:8001 (file persistante) | Ctrl+C pour arrêter\n',flush=True)
  village.start()
  try:srv.serve_forever(poll_interval=.35)
  except KeyboardInterrupt:pass

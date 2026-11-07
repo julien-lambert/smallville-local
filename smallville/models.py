@@ -33,18 +33,36 @@ class Apple:
   return asyncio.run(inner())
  def speak(self,a,b,ctx,heard=''):
   system=(f"Tu es {a['name']}, personnage d'une société fictive. {a['bio']} "
-   f"But: {a['goal']}. Tu ne connais que TES propres souvenirs, croyances et ce qui t'a été dit. "
+   f"But: {a['goal']}. Tu ne connais que TES propres souvenirs, croyances et ce qui t'a été dit. Des croyances sont infondées, d'autres contredites, ne les affirme pas comme des certitudes si elles sont fragiles. Le village est pieux, soupçonneux, politique ; le meurtre est impossible. "
    "Une seule réplique en français naturel, 1 ou 2 phrases, 40 mots maximum. "
    "Aucune narration, aucun préfixe de personnage, ne devine pas les secrets des autres.")
   prompt=json.dumps({'destinataire':b['name'],'mes_emotions':ctx['affect'],
    'mes_traits':ctx['traits'],'mon_opinion_de_l_autre':ctx['relation'],
+   'ma_vision_du_monde':ctx.get('worldview'),
+   'mes_emotions_dynamiques':ctx.get('emotions'),
+   'mon_reseau_de_saillance':ctx.get('salience'),
+   'mon_intention_actuelle':ctx.get('intention'),
+   'mon_niveau_de_confiance_communautaire':ctx.get('community_trust'),
+   'ma_crainte_de_mexprimer':ctx.get('expression_inhibition'),
+   'experience_courante':ctx.get('present_experience'),
+   'mes_jugements_recents':ctx.get('mental_trace'),
+   'ma_priorite_politique':ctx.get('political_priority'),
+   'heure_simulee':ctx.get('time'),
    'mes_souvenirs':ctx['memories'],'mes_croyances':ctx['beliefs'],
-   'sujet':ctx['topic'],'intention':ctx['stance'],'phrase_entendue':heard},ensure_ascii=False)
+   'sujet':ctx['topic'],'intention':ctx['stance'],'phrase_entendue':heard,
+   'vie_materielle':ctx.get('resources'),'reseau_percu':ctx.get('graph_neighborhood'),
+   'public':ctx.get('group',[])},ensure_ascii=False)
   return clean(self.query(system,prompt))
  def reflect(self,a,mem):
-  return clean(self.query(f"Tu es {a['name']}. Résume à la première personne, deux phrases, "
-     "les apprentissages du jour; ne crée pas de faits.",
-     json.dumps([m['content'] for m in mem[:8]],ensure_ascii=False)),450)
+  return clean(self.query(f"Tu es {a['name']}. {a['bio']} Décris en deux phrases "
+     "à la première personne ce que tu as appris, et comment cela influe sur ton conatus et tes choix. N'invente pas de faits.",
+     json.dumps({'memoires':[m['content'] for m in mem[:8]],
+       'conatus':a.get('conatus'),'but':a.get('goal'),'religiosite':a.get('religiosity'),
+       'soupcon':a.get('suspicion'),'ressources':a.get('provisions'),
+       'monde_percu':a.get('worldview'),'emotions':a.get('emotions'),
+       'salience':a.get('salience'),'intention':a.get('intention'),
+       'priorite_politique':a.get('political_priority'),
+       'dernier_jugement':a.get('mental_trace')},ensure_ascii=False)),450)
 
 class MLX:
  name='mlx_local'

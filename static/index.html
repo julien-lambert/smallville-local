@@ -1,27 +1,37 @@
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smallville Local — Laboratoire de sociétés artificielles</title>
+<title>Salem-sur-Brume · laboratoire de sociétés génératives</title>
 <link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script></head>
 <body>
-<header class="header"><div class="brand"><div class="mark">S<span>•</span></div><div><strong>SMALLVILLE <small>LOCAL</small></strong><p>Laboratoire de sociétés artificielles</p></div></div>
-<div class="top-status"><span id="clock">Jour 1 · 08:00</span><span class="dot-sep">·</span><span id="brain-name">Connexion…</span><span id="jev-chip" class="tag muted">Jev hors ligne</span></div>
-<div class="controls"><button id="play" class="primary">▶ Démarrer</button><button id="step">Pas +1</button><select id="speed" aria-label="Vitesse"><option value="1.6">Lent ×0,5</option><option value="0.85" selected>Normal ×1</option><option value="0.4">Rapide ×2</option><option value="0.2">Rapide ×4</option></select></div></header>
+<header class="header"><div class="brand"><div class="mark">S<span>•</span></div><div><strong>SALEM <small>SUR-BRUME</small></strong><p>Laboratoire politique et religieux · 25 agents</p></div></div>
+<div class="top-status"><span id="clock">Jour 1 · 08:00</span><span class="dot-sep">·</span><span id="brain-name">Connexion…</span><span id="jev-chip" class="tag muted">Jev désactivé</span></div>
+<div class="controls"><button id="play" class="primary">▶ Démarrer</button><button id="step">Pas +1</button><button id="advance">+ 4 h</button><button id="election-jump">Vers le scrutin</button><select id="speed" aria-label="Vitesse"><option value="1.6">Lent</option><option value="0.85" selected>Normal</option><option value="0.4">Rapide ×2</option><option value="0.2">Rapide ×4</option></select></div></header>
 <main class="layout">
-<aside class="sidebar"><div class="pane-head"><span class="eyebrow">POPULATION</span><span id="count" class="count">6 habitants</span></div>
+<aside class="sidebar"><div class="pane-head"><span class="eyebrow">POPULATION</span><span id="count" class="count">25 habitants</span></div>
 <div class="agents" id="agents"></div>
-<div class="side-bottom"><div class="eyebrow">EXPÉRIENCE</div><p>Chaque habitant possède des souvenirs et des croyances privés. Les relations ne sont pas forcément réciproques.</p>
-<div class="metric"><span>Appels Jev</span><strong id="jev-calls">0 / 100</strong></div><div class="metric"><span>Réservé / dépensé</span><strong id="jev-cost">$0.000 / $0.75</strong></div><div class="budget-track"><div id="budget-fill"></div></div>
-<label class="toggle"><input type="checkbox" id="jev-toggle"><span>Utiliser Jev pour juger les rencontres</span></label>
-<small class="disclosure">Désactivé au lancement. Appels distants seulement vers api.typesafe.ai. Quotas conservés après remise à zéro.</small></div></aside>
-<section class="center"><div class="section-bar"><div><span class="eyebrow">ENVIRONNEMENT SIMULÉ</span><h1>Un petit monde, six perspectives</h1></div><div class="world-status"><span class="alive"></span><span id="state-label">En pause</span></div></div>
-<div class="world-wrap"><canvas id="world" width="960" height="720" aria-label="Carte du village avec six agents, bâtiments et chemins"></canvas><div class="map-key"><span>● Habitants</span><span>▥ Bâtiments</span><span>✦ Place publique</span></div></div>
-<div class="timeline-heading"><span class="eyebrow">ÉVÉNEMENTS EN DIRECT</span><div class="row-tools"><span id="pending">0 décision en cours</span><button id="export">Exporter JSON</button></div></div>
+<div class="side-bottom"><div class="eyebrow">INFÉRENCE ET COÛT</div>
+<div class="metric"><span>Appels Jev</span><strong id="jev-calls">0 / 3500</strong></div><div class="metric"><span>Réservé / dépensé</span><strong id="jev-cost">$0.000 / $4.25</strong></div><div class="budget-track"><div id="budget-fill"></div></div>
+<label class="toggle"><input type="checkbox" id="jev-toggle"><span>Jev : décisions, croyances et interactions</span></label>
+<small class="disclosure">Désactivé au lancement. Jugements réguliers dès activation, budget cumulé conservé. Seule API externe : api.typesafe.ai.</small>
+<div class="metric"><span>Graphe SurrealDB</span><strong id="graph-status">Initialisation</strong></div>
+<small class="disclosure" id="graph-queue"></small>
+</div></aside>
+<section class="center"><div class="section-bar"><div><span class="eyebrow">VILLAGE FICTIF · 1692 ALTERNATIF</span><h1>Une société sous l'emprise du soupçon</h1></div><div class="world-status"><span class="alive"></span><span id="state-label">En pause</span></div></div>
+<div class="world-wrap"><canvas id="world" width="1100" height="800" aria-label="Village avec 25 agents, une église, une mairie et une place publique"></canvas><div class="map-key"><span>● Habitants</span><span>▥ Église, mairie, marché</span><span>✦ Place des assemblées</span></div></div>
+<div class="research-grid">
+<section class="research-panel" aria-label="Élections"><div class="eyebrow">CAMPAGNE & SCRUTIN</div><div id="politics" class="politics"></div></section>
+<section class="research-panel" aria-label="Graph social"><div class="row-tools"><span class="eyebrow">GRAPHE SOCIAL · RELATIONS DIRIGÉES</span><a href="/api/graph" target="_blank" rel="noopener">Données JSON</a></div><canvas id="network" width="340" height="240" aria-label="Réseau des 25 agents"></canvas><p class="network-key">Traits clairs : confiance · orangés : tensions. Clique sur un nœud.</p></section>
+</div>
+<div class="timeline-heading"><span class="eyebrow">CHRONIQUE DE LA SOCIÉTÉ</span><div class="row-tools"><span id="pending">0 tâche</span><button id="export">Exporter le corpus JSON</button></div></div>
 <div id="events" class="events"></div></section>
-<aside class="inspector"><div class="pane-head"><span class="eyebrow">INSPECTEUR COGNITIF</span><span class="count">Vue subjective</span></div>
+<aside class="inspector"><div class="pane-head"><span class="eyebrow">INDIVIDU & CONTEXTE</span><span class="count">Vue subjective</span></div>
 <div id="profile" class="profile"></div>
 <div class="tabs"><button data-tab="mind" class="active">Psyché</button><button data-tab="memory">Mémoire</button><button data-tab="belief">Croyances</button><button data-tab="relation">Relations</button></div>
 <div id="inspector-content" class="inspector-body"></div>
-<div class="inject"><label for="whisper">Introduire une information privée</label><textarea id="whisper" maxlength="240" rows="3" placeholder="Ex. : La fête de demain a été annulée…"></textarea><button id="whisper-send" class="primary outline">Informer cet habitant</button><small>Seul le personnage sélectionné reçoit cette croyance. Observe si elle circule.</small></div>
-<div class="footer-tools"><button id="reset">Réinitialiser le monde</button><a href="/api/export" download="smallville_export.json">Sauvegarder l'expérience</a></div></aside>
-</main><div id="toast" class="toast" role="status"></div>
+<div class="inject"><label for="whisper">Introduire une croyance ou une information</label>
+<div class="inject-controls"><select id="inject-mode"><option value="information">Information communiquée</option><option value="belief">Croyance suggérée</option></select><select id="inject-scope"><option value="individual">À cet habitant</option><option value="public">Annonce à tous</option></select></div>
+<textarea id="whisper" maxlength="300" rows="3" placeholder="Ex. : Le prêtre affirme que Chloé prépare un complot, sans preuve…"></textarea><button id="whisper-send" class="primary outline">Introduire dans la société</button>
+<small>Ces propos deviennent des croyances subjectives, jamais des faits garantis. Les autres peuvent les accepter, les discuter ou les rejeter.</small>
+</div><div class="footer-tools"><button id="reset">Réinitialiser</button><a href="/api/export" download="salem_sur_brume_corpus.json">Exporter</a></div>
+</aside></main><div id="toast" class="toast" role="status"></div>
 </body></html>

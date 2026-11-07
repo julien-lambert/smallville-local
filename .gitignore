@@ -6,3 +6,9 @@ data/settings.json
 __pycache__/
 *.pyc
 .DS_Store
+data/surreal/
+data/surreal.log
+data/*.sqlite3-shm
+data/*.sqlite3-wal
+data/*.tmp
+data/exports/

@@ -1,46 +1,47 @@
 #!/bin/bash
-# Installation macOS sans service cloud pour Smallville (sauf Jev explicitement activé).
+# Configuration non destructive : jamais de suppression de .env, SQLite ou SurrealKV.
 set -e
 cd "$(dirname "$0")"
-printf '\n  SMALLVILLE LOCAL  — installation sur ton Mac\n  ===========================================\n\n'
-if [ "$(uname -s)" != 'Darwin' ]; then
-  printf 'Cette installation est prévue pour macOS. Le serveur fonctionne aussi sous Python ailleurs.\n'
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-  printf 'Python 3 absent. Installe Python 3.10+ puis relance Installer.command.\n'; exit 1
-fi
-python3 - <<'PY'
-import sys
-if sys.version_info < (3,10):
-    raise SystemExit('Python 3.10 ou ultérieur requis. Version détectée : '+sys.version)
-print('Python détecté :',sys.version.split()[0])
-PY
-if [ ! -d .venv ]; then python3 -m venv .venv; fi
-printf '\nClé Jev : elle sera stockée UNIQUEMENT sur ce Mac dans .env (mode 600).\n'
-printf 'Colle ta clé TypeSafe, puis appuie sur Entrée (saisie masquée).\n'
-read -r -s -p 'TYPESAFE_API_KEY (vide pour conserver la clé existante ou désactiver) : ' API_KEY
+printf '\nSMALLVILLE — installation / mise à niveau macOS\n============================================\n'
+command -v python3 >/dev/null || { echo 'Python 3.10+ requis.'; exit 1; }
+python3 -c 'import sys; assert sys.version_info >= (3,10), "Python 3.10+ requis"'
+if [ ! -x .venv/bin/python ]; then python3 -m venv .venv; fi
+printf '\nClé Jev existante : conservée. Entrée vide = aucun changement.\n'
+read -r -s -p 'Nouvelle clé TYPESAFE_API_KEY (facultatif) : ' NEW_JEV
 printf '\n'
-if [ -n "$API_KEY" ]; then
-  umask 077
-  printf '%s\n' "$API_KEY" | .venv/bin/python -c 'import os,pathlib,sys;p=pathlib.Path(".env");p.write_text("TYPESAFE_API_KEY="+sys.stdin.read().rstrip("\n")+"\n",encoding="utf8");os.chmod(p,0o600)'
-  unset API_KEY
-  printf 'Clé enregistrée. Elle ne sera jamais incluse dans les exports.\n'
-else
-  printf 'Clé conservée si présente ; sinon Jev restera désactivé.\n'
+# Transfert sécurisé par stdin (jamais dans les arguments, ni dans le dépôt).
+printf '%s' "$NEW_JEV" | .venv/bin/python -c '
+import pathlib,os,secrets,sys
+p=pathlib.Path(".env"); d={}
+if p.exists():
+ for row in p.read_text().splitlines():
+  if "=" in row and not row.startswith("#"):
+   k,v=row.split("=",1);d[k]=v
+key=sys.stdin.read().strip()
+if key: d["TYPESAFE_API_KEY"]=key
+d.setdefault("SURREAL_USER","root")
+d.setdefault("SURREAL_PASS",secrets.token_urlsafe(30))
+os.umask(0o077)
+p.write_text("".join(k+"="+v+"\n" for k,v in d.items()),encoding="utf8")
+os.chmod(p,0o600)
+print(".env préservé, identifiants SurrealDB initialisés localement.")
+'
+unset NEW_JEV
+if ! command -v surreal >/dev/null 2>&1; then
+  printf '\nSurrealDB permet de sauvegarder le graphe sur disque, indépendamment de SQLite.\n'
+  read -r -p 'Installer SurrealDB via Homebrew [o/N] ? ' Y
+  case "$Y" in
+    o|O|oui|y|Y)
+      if command -v brew >/dev/null 2>&1; then brew install surrealdb/tap/surreal
+      else echo 'Homebrew absent. Installation SurrealDB : https://surrealdb.com/surrealdb/install';fi;;
+    *) echo 'SurrealDB ignoré : le serveur sera utilisable en mode SQLite dégradé.';;
+  esac
 fi
-printf '\nMode IA Apple : macOS 26+, Apple Intelligence activé et Xcode 26+ sont nécessaires.\n'
-printf 'Installer maintenant apple-fm-sdk depuis PyPI ? Cette étape télécharge des paquets,\n'
-printf 'mais l application ne contacte ensuite aucun service cloud hors Jev.\n'
-read -r -p 'Installer le SDK Apple [o/N] ? ' ANSWER
-case "$ANSWER" in
-  o|O|oui|OUI|y|Y|yes|YES)
-    if .venv/bin/python -m pip install apple-fm-sdk; then
-      printf 'SDK installé. La disponibilité réelle du modèle sera testée au lancement.\n'
-    else
-      printf 'Installation SDK impossible. Smallville reste exécutable en mode scripté.\n'
-    fi;;
-  *) printf 'SDK non installé. Tu pourras l ajouter plus tard via .venv/bin/pip install apple-fm-sdk.\n';;
+printf '\nModèle Apple : macOS 26+, Apple Intelligence activé, Xcode 26+.\n'
+read -r -p 'Installer / mettre à jour le SDK local Apple depuis PyPI [o/N] ? ' Y
+case "$Y" in
+  o|O|oui|y|Y) .venv/bin/python -m pip install --upgrade apple-fm-sdk || echo 'SDK Apple indisponible, mode scripté maintenu.';;
+  *) echo 'SDK Apple conservé tel quel.';;
 esac
-printf '\nInstallation terminée. Lance Lancer.command.\n'
-printf 'Sécurité : appels Jev désactivés à chaque démarrage ; plafond local par défaut 0,75 USD.\n\n'
-read -r -p 'Entrée pour fermer… ' _unused
+printf '\nTerminé. Lance Lancer.command. Aucune donnée locale n’a été réinitialisée.\n'
+read -r -p 'Entrée pour fermer… ' _
